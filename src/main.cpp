@@ -16,7 +16,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "dynamixel_sdk.h"                                  // Uses Dynamixel SDK library
+#include "dynamixel_sdk/dynamixel_sdk.h"                                  // Uses Dynamixel SDK library
 #include "port_handler.h"
 
 // Control table address

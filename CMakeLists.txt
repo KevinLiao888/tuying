@@ -18,7 +18,7 @@ include_directories(${aris_INCLUDE_DIRS})
 message(${aris_DIR})
 
 # user program started...
-set(SOURCE_FILES src/main.cpp src/kaanh.cpp src/kaanh.h src/dynamixel_sdk.h)
+set(SOURCE_FILES src/main.cpp src/kaanh.cpp src/kaanh.h)
 add_executable(tuying ${SOURCE_FILES})
 
 
@@ -28,6 +28,7 @@ add_executable(tuying ${SOURCE_FILES})
 
 if(UNIX)
 	target_link_libraries(tuying ${aris_LIBRARIES} atomic)
+        target_link_libraries(tuying ${dynamixel_LIBRARIES} /usr/local/lib/libdxl_x64_cpp.so)
 endif(UNIX)
 IF(WIN32)
 	target_link_libraries(tuying ${aris_LIBRARIES})
