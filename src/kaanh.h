@@ -248,6 +248,60 @@ namespace kaanh
 		ARIS_REGISTER_TYPE(JogJ7);
 	};
 
+	class DMode : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+		explicit DMode(const std::string &name = "DMode_plan");
+		ARIS_REGISTER_TYPE(DMode);
+	};
+
+	class DEnable : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+		explicit DEnable(const std::string &name = "DEnable_plan");
+		ARIS_REGISTER_TYPE(DEnable);
+	};
+
+	class DDisable : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+		explicit DDisable(const std::string &name = "DDisable_plan");
+		ARIS_REGISTER_TYPE(DDisable);
+	};
+
+	class DJ1 : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+		explicit DJ1(const std::string &name = "DJ1_plan");
+		ARIS_REGISTER_TYPE(DJ1);
+	};
+
+	class DJ2 : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+		explicit DJ2(const std::string &name = "DJ2_plan");
+		ARIS_REGISTER_TYPE(DJ2);
+	};
+
+	class DJ3 : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+		explicit DJ3(const std::string &name = "DJ3_plan");
+		ARIS_REGISTER_TYPE(DJ3);
+	};
+
 	class JX : public aris::plan::Plan
 	{
 	public:
@@ -377,6 +431,14 @@ namespace kaanh
 		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
 		explicit SaveConfig(const std::string &name = "SaveConfig_plan");
 		ARIS_REGISTER_TYPE(SaveConfig);
+	};
+
+	class SavePoint : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		explicit SavePoint(const std::string &name = "SavePoint_plan");
+		ARIS_REGISTER_TYPE(SavePoint);
 	};
 
 	class SetVel : public aris::plan::Plan

@@ -12,6 +12,17 @@ extern kaanh::Speed g_vel;
 extern std::atomic_int g_vel_percent;
 //global vel//
 
+extern std::mutex dynamixel_mutex;
+extern std::atomic_int mode_dynamixel;
+extern std::atomic_bool enable_dynamixel_auto;
+extern std::atomic_bool enable_dynamixel_manual;
+extern std::atomic_int is_enabled;
+extern std::atomic_int target_pos1, target_pos2, target_pos3;
+extern std::atomic_int current_pos1, current_pos2, current_pos3;
+extern std::vector<std::vector<double>> dxl_pos;
+
+std::atomic<std::array<double, 10> > save_point;
+
 kaanh::CmdListParam cmdparam;
 
 namespace kaanh
@@ -436,7 +447,7 @@ namespace kaanh
 		par.part_pq.resize(target.model->partPool().size() * 7, 0.0);
 		par.end_pq.resize(7, 0.0);
 		par.end_pe.resize(6, 0.0);
-		par.motion_pos.resize(6, 0.0);
+		par.motion_pos.resize(10, 0.0);
 		par.motion_vel.resize(6, 0.0);
 		par.motion_acc.resize(6, 0.0);
 		par.motion_toq.resize(6, 0.0);
@@ -507,6 +518,12 @@ namespace kaanh
 		}, param);
 
 		auto out_data = std::any_cast<GetParam &>(param);
+		
+		//舵机//
+		out_data.motion_pos[7] = current_pos1.load();
+		out_data.motion_pos[8] = current_pos2.load();
+		out_data.motion_pos[9] = current_pos3.load();
+
 		std::vector<int> slave_online(6, 0), slave_al_state(6, 0);
 		for (aris::Size i = 0; i < 6; i++)
 		{
@@ -531,6 +548,10 @@ namespace kaanh
 		out_param.push_back(std::make_pair<std::string, std::any>("motion_state", out_data.motion_state));
 		out_param.push_back(std::make_pair<std::string, std::any>("current_plan", out_data.currentplan));
 		out_param.push_back(std::make_pair<std::string, std::any>("current_plan_id", cmdparam.current_plan_id));
+
+		std::array<double, 10> temp = { 0,0,0,0,0,0,0,0,0,0 };
+		std::copy(out_data.motion_pos.begin(), out_data.motion_pos.end(), temp.begin());
+		save_point.store(temp);
 
 		target.ret = out_param;
 		target.option |= NOT_RUN_EXECUTE_FUNCTION | NOT_PRINT_CMD_INFO | NOT_PRINT_CMD_INFO;
@@ -578,11 +599,14 @@ namespace kaanh
 			if (cmd_param.first == "col")
 			{
 				param.col = std::stoi(cmd_param.second);
-				param.pos.resize(param.col);
+				param.pos.resize(7);
 				param.begin_pos.resize(param.col - 1);
 			}
 			else if (cmd_param.first == "path")
 			{
+				std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
+				dxl_pos.clear();
+				dxl_pos.resize(3);
 				std::vector<std::vector<double>> pos(param.col);
 				auto path = cmd_param.second;
 				infile.open(path);
@@ -623,11 +647,25 @@ namespace kaanh
 					char *sp_input = strtok(s_input, split);
 					double data_input;
 					int i = 0;
+					int j = 0;
 					while (sp_input != NULL)
 					{
 						data_input = atof(sp_input);
-						pos[i++].push_back(data_input);
-						sp_input = strtok(NULL, split);
+						//前7轴的位置//
+						if (i <= 6)
+						{
+							pos[i++].push_back(data_input);
+							sp_input = strtok(NULL, split);
+							continue;
+						}
+						if (i > 6)
+						{
+							dxl_pos[j++].push_back(data_input);
+							i++;
+							sp_input = strtok(NULL, split);
+							continue;
+						}
+						if (i >= param.col)THROW_FILE_LINE("the format of emily file is not ok");
 					}
 				}
 				for (int i = 0; i < pos.size(); i++)
@@ -646,7 +684,7 @@ namespace kaanh
 		target.param = param;
 
 		//std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::USE_TARGET_POS);
-		for (int j = 0; j < param.col; j++)
+		for (int j = 0; j < param.pos.size(); j++)
 		{
 			for (int i = 0; i < 13; i++)
 			{
@@ -658,6 +696,8 @@ namespace kaanh
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
 
+		// 使能舵机emily功能 //
+		enable_dynamixel_auto.store(true);
 	}
 	auto MoveT::executeRT(PlanTarget &target)->int
 	{
@@ -3019,6 +3059,152 @@ namespace kaanh
 	}
 
 
+	// 切换舵机模式 //
+	auto DMode::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		for (auto &p : params)
+		{
+			if (p.first == "mode")
+			{
+				mode_dynamixel.store(std::stoi(p.second));
+			}		
+		}
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+	}
+	auto DMode::collectNrt(PlanTarget &target)->void {}
+	DMode::DMode(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"dmode\">"
+			"	<GroupParam>"
+			"		<GroupParam>"
+			"			<Param name=\"mode\" default=\"0\"/>"
+			"		</GroupParam>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 使能舵机 //
+	auto DEnable::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		is_enabled.store(1);
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+	}
+	auto DEnable::collectNrt(PlanTarget &target)->void {}
+	DEnable::DEnable(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"denable\">"
+			"</Command>");
+	}
+
+
+	// 去使能舵机 //
+	auto DDisable::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		is_enabled.store(0);
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+	}
+	auto DDisable::collectNrt(PlanTarget &target)->void {}
+	DDisable::DDisable(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"ddisable\">"
+			"</Command>");
+	}
+
+	// 1号舵机点动 //
+	auto DJ1::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		int step = 0;
+		for (auto &p : params)
+		{
+			if (p.first == "step")
+			{
+				step = std::stoi(p.second);
+			}	
+		}
+		target_pos1 += step;
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+		enable_dynamixel_manual.store(1);
+	}
+	auto DJ1::collectNrt(PlanTarget &target)->void{}
+	DJ1::DJ1(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"dj1\">"
+			"	<GroupParam>"
+			"		<Param name=\"step\" default=\"2\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 1号舵机点动 //
+	auto DJ2::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		int step = 0;
+		for (auto &p : params)
+		{
+			if (p.first == "step")
+			{
+				step = std::stoi(p.second);
+			}
+		}
+		target_pos2 += step;
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+		enable_dynamixel_manual.store(1);
+	}
+	auto DJ2::collectNrt(PlanTarget &target)->void {}
+	DJ2::DJ2(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"dj2\">"
+			"	<GroupParam>"
+			"		<Param name=\"step\" default=\"2\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 1号舵机点动 //
+	auto DJ3::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		int step = 0;
+		for (auto &p : params)
+		{
+			if (p.first == "step")
+			{
+				step = std::stoi(p.second);
+			}
+		}
+		target_pos3 += step;
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+		enable_dynamixel_manual.store(1);
+	}
+	auto DJ3::collectNrt(PlanTarget &target)->void {}
+	DJ3::DJ3(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"dj3\">"
+			"	<GroupParam>"
+			"		<Param name=\"step\" default=\"2\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
 #define JOGC_PARAM_STRING \
 		"	<UniqueParam>"\
 		"		<GroupParam>"\
@@ -4643,7 +4829,52 @@ namespace kaanh
 			"</Command>");
 	}
 
+
+	// 保存示教点 //
+	auto SavePoint::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		auto&cs = aris::server::ControlServer::instance();
 	
+		std::string point_name;
+		for (auto &p : params)
+		{
+			if (p.first == "point_name")
+			{
+				point_name = p.second;
+			}
+		}
+
+		auto temp_pos = save_point.load();
+		aris::core::Matrix mat(1, 10, temp_pos.data());
+		if (target.model->variablePool().findByName(point_name) != target.model->variablePool().end())
+		{
+			dynamic_cast<aris::dynamic::MatrixVariable*>(&*target.model->variablePool().findByName(point_name))->data() = mat;
+		}
+		else
+		{
+			target.model->variablePool().add<aris::dynamic::MatrixVariable>(point_name, mat);
+		}
+
+		auto xmlpath = std::filesystem::absolute(".");
+		const std::string xmlfile = "kaanh.xml";
+		xmlpath = xmlpath / xmlfile;
+		cs.saveXmlFile(xmlpath.string().c_str());
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+		target.option = aris::plan::Plan::NOT_RUN_EXECUTE_FUNCTION;
+	}
+	SavePoint::SavePoint(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"savepoint\">"
+			"	<GroupParam>"
+			"		<Param name=\"point_name\" default=\"homepoint\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
 	//设置全局速度//
 	struct SetVelParam
 	{
@@ -4804,6 +5035,10 @@ namespace kaanh
 		plan_root->planPool().add<kaanh::JogJ5>();
 		plan_root->planPool().add<kaanh::JogJ6>();
 		plan_root->planPool().add<kaanh::JogJ7>();
+		plan_root->planPool().add<kaanh::DMode>();
+		plan_root->planPool().add<kaanh::DJ3>();
+		plan_root->planPool().add<kaanh::DJ3>();
+		plan_root->planPool().add<kaanh::DJ3>();
 		plan_root->planPool().add<kaanh::JX>();
 		plan_root->planPool().add<kaanh::JY>();
 		plan_root->planPool().add<kaanh::JZ>();
