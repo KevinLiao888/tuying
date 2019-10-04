@@ -215,7 +215,8 @@ namespace kaanh
 
 				controller->slavePool().add<aris::control::EthercatMotion>().loadXmlStr(xml_str);
 			}
-		}	
+		}
+		/*
 		double pos_offset = 500.0 / 8388608.0 * 250;	//在零位时，为500count
 		double pos_factor = 8388608.0 * 250;	//运行1m需要转250转
 		double max_pos = 10.0;
@@ -259,6 +260,7 @@ namespace kaanh
 			"</EthercatMotion>";
 
 		controller->slavePool().add<aris::control::EthercatMotion>().loadXmlStr(xml_str);
+		*/
 		return controller;
 	};
 	auto createModelQifan()->std::unique_ptr<aris::dynamic::Model>
@@ -5154,10 +5156,10 @@ namespace kaanh
         plan_root->planPool().add<aris::plan::Recover>();
         auto &rs = plan_root->planPool().add<aris::plan::Reset>();
         //for qifan robot//
-        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
+        rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
 
         //for rokae robot//
-        rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
+        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
 
         plan_root->planPool().add<aris::plan::MoveAbsJ>();
         plan_root->planPool().add<aris::plan::MoveL>();

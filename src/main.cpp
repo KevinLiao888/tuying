@@ -20,8 +20,8 @@ auto modelxmlpath = std::filesystem::absolute(".");
 const std::string xmlfile = "kaanh.xml";
 const std::string uixmlfile = "interface_kaanh.xml";
 //for qifan robot//
-//const std::string modelxmlfile = "model_qifan.xml";
-const std::string modelxmlfile = "model_rokae.xml";
+const std::string modelxmlfile = "model_qifan.xml";
+//const std::string modelxmlfile = "model_rokae.xml";
 
 
 
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
 	auto&cs = aris::server::ControlServer::instance();
 	auto port = argc < 2 ? 5866 : std::stoi(argv[1]);
 
-	/*
+	
 	//生成kaanh.xml文档	
 	//-------for qifan robot begin//
 	cs.resetController(kaanh::createControllerQifan().release());
@@ -48,9 +48,9 @@ int main(int argc, char *argv[])
 	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for qifan robot end// 
-	*/
-
 	
+
+	/*
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
 	cs.resetModel(kaanh::createModelRokae().release());
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for rokae robot end// 
-	
+	*/
 
 	cs.loadXmlFile(xmlpath.string().c_str());
 	
