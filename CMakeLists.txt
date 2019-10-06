@@ -13,9 +13,17 @@ endif(UNIX)
 IF(WIN32)
 	find_package(aris REQUIRED PATHS C:/aris/aris-1.5.0)
 endif(WIN32)
-include_directories(${aris_INCLUDE_DIRS} C:/Users/kevin/Desktop/Dynamixel/Dynamixel/c++/include/dynamixel_sdk)
+
+if(UNIX)
+        include_directories(${aris_INCLUDE_DIRS} /usr/local/include/dynamixel_sdk)
+endif(UNIX)
+IF(WIN32)
+        include_directories(${aris_INCLUDE_DIRS} C:/Users/kevin/Desktop/Dynamixel/Dynamixel/c++/include/dynamixel_sdk)
+endif(WIN32)
 
 message(${aris_DIR})
+
+link_directories(/usr/local/lib)
 
 # user program started...
 set(SOURCE_FILES src/main.cpp src/kaanh.cpp src/kaanh.h)
@@ -27,8 +35,7 @@ add_executable(tuying ${SOURCE_FILES})
 # target_link_libraries(kaanh kaanh_lib)
 
 if(UNIX)
-	target_link_libraries(tuying ${aris_LIBRARIES} atomic)
-    target_link_libraries(tuying ${dynamixel_LIBRARIES} /usr/local/lib/dxl_x64_cpp.so)
+        target_link_libraries(tuying ${aris_LIBRARIES} atomic libdxl_x64_cpp.so)
 endif(UNIX)
 IF(WIN32)
 	target_link_libraries(tuying ${aris_LIBRARIES} C:/Users/kevin/Desktop/Dynamixel/Dynamixel/c++/build/win32/Debug/dxl_x86_cpp.lib)

@@ -41,9 +41,15 @@ const int DXL_ID3 = 3;
 const int BAUDRATE1 = 57600;
 const int BAUDRATE2 = 1000000;
 const int BAUDRATE3 = 1000000;
-//#define DEVICENAME                      "/dev/ttyUSB0"      // Check which port is being used on your controller
-															// ex) Windows: "COM1"   Linux: "/dev/ttyUSB0" Mac: "/dev/tty.usbserial-*"
-#define DEVICENAME                      "COM11" 
+
+#ifdef UNIX
+    #define DEVICENAME                      "/dev/ttyUSB0"      // Check which port is being used on your controller
+                                                                // ex) Windows: "COM1"   Linux: "/dev/ttyUSB0" Mac: "/dev/tty.usbserial-*"
+#endif
+
+//#ifdef WIN32
+//    #define DEVICENAME                      "COM11"
+//#endif
 
 #define TORQUE_ENABLE                   1                   // Value for enabling the torque
 #define TORQUE_DISABLE                  0                   // Value for disabling the torque
