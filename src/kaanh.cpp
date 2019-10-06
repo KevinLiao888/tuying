@@ -3129,11 +3129,12 @@ namespace kaanh
 		{
 			if (p.first == "step")
 			{
-				step = std::stoi(p.second);
+				step = 11.378*std::stoi(p.second);
 			}	
 		}
 		target_pos1 += step;
 
+		std::cout << "target_pos1:" << target_pos1 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
 		enable_dynamixel_manual.store(1);
@@ -3150,7 +3151,7 @@ namespace kaanh
 	}
 
 
-	// 1号舵机点动 //
+	// 2号舵机点动 //
 	auto DJ2::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
 		int step = 0;
@@ -3158,11 +3159,12 @@ namespace kaanh
 		{
 			if (p.first == "step")
 			{
-				step = std::stoi(p.second);
+				step = 11.378*std::stoi(p.second);
 			}
 		}
 		target_pos2 += step;
 
+		std::cout << "target_pos2:" << target_pos2 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
 		enable_dynamixel_manual.store(1);
@@ -3179,7 +3181,7 @@ namespace kaanh
 	}
 
 
-	// 1号舵机点动 //
+	// 3号舵机点动 //
 	auto DJ3::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
 		int step = 0;
@@ -3187,11 +3189,12 @@ namespace kaanh
 		{
 			if (p.first == "step")
 			{
-				step = std::stoi(p.second);
+				step = 11.378*std::stoi(p.second);
 			}
 		}
 		target_pos3 += step;
 
+		std::cout << "target_pos3:" << target_pos3 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
 		enable_dynamixel_manual.store(1);
@@ -3203,6 +3206,67 @@ namespace kaanh
 			"<Command name=\"dj3\">"
 			"	<GroupParam>"
 			"		<Param name=\"step\" default=\"2\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 舵机moveabsj //
+	struct DMoveAbsJParam
+	{
+		std::vector<double> joint_pos_vec;
+		std::vector<bool> joint_active_vec;
+		const int d_num = 3;
+	};
+	auto DMoveAbsJ::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		DMoveAbsJParam param;
+		int step = 0;
+		for (auto cmd_param : params)
+		{
+			if (cmd_param.first == "all")
+			{
+				param.joint_active_vec.resize(param.d_num, true);
+			}
+			else if (cmd_param.first == "motion_id")
+			{
+				param.joint_active_vec.resize(param.d_num, false);
+				param.joint_active_vec.at(std::stoi(cmd_param.second)) = true;
+			}
+			else if (cmd_param.first == "pos")
+			{
+				aris::core::Matrix mat = target.model->calculator().calculateExpression(cmd_param.second);
+				if (mat.size() == 1)param.joint_pos_vec.resize(param.d_num, mat.toDouble());
+				else
+				{
+					param.joint_pos_vec.resize(mat.size());
+					std::copy(mat.begin(), mat.end(), param.joint_pos_vec.begin());
+				}
+			}
+		}
+
+		target_pos1.store(int(11.378*param.joint_pos_vec[0]));
+		target_pos2.store(int(11.378*param.joint_pos_vec[1]));
+		target_pos3.store(int(11.378*param.joint_pos_vec[2]));
+		std::cout << "target_pos1:" << target_pos1 << std::endl;
+		std::cout << "target_pos2:" << target_pos2 << std::endl;
+		std::cout << "target_pos3:" << target_pos3 << std::endl;
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+		enable_dynamixel_manual.store(1);
+	}
+	auto DMoveAbsJ::collectNrt(PlanTarget &target)->void {}
+	DMoveAbsJ::DMoveAbsJ(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"dmvaj\">"
+			"	<GroupParam>"
+			"		<UniqueParam default=\"all\">"
+			"			<Param name=\"all\" abbreviation=\"a\"/>"
+			"			<Param name=\"motion_id\" abbreviation=\"m\" default=\"0\"/>"
+			"		</UniqueParam>"
+			"		<Param name=\"pos\" default=\"0\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -5041,9 +5105,10 @@ namespace kaanh
 		plan_root->planPool().add<kaanh::DMode>();
         plan_root->planPool().add<kaanh::DEnable>();
         plan_root->planPool().add<kaanh::DDisable>();
+		plan_root->planPool().add<kaanh::DJ1>();
+		plan_root->planPool().add<kaanh::DJ2>();
 		plan_root->planPool().add<kaanh::DJ3>();
-		plan_root->planPool().add<kaanh::DJ3>();
-		plan_root->planPool().add<kaanh::DJ3>();
+		plan_root->planPool().add<kaanh::DMoveAbsJ>();
 		plan_root->planPool().add<kaanh::JX>();
 		plan_root->planPool().add<kaanh::JY>();
 		plan_root->planPool().add<kaanh::JZ>();

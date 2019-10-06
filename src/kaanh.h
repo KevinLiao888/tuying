@@ -302,6 +302,15 @@ namespace kaanh
 		ARIS_REGISTER_TYPE(DJ3);
 	};
 
+	class DMoveAbsJ : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+		explicit DMoveAbsJ(const std::string &name = "DMoveAbsJ_plan");
+		ARIS_REGISTER_TYPE(DMoveAbsJ);
+	};
+
 	class JX : public aris::plan::Plan
 	{
 	public:
