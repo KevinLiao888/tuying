@@ -16,9 +16,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "dynamixel_sdk/dynamixel_sdk.h"                                  // Uses Dynamixel SDK library
-#include "dynamixel_sdk/port_handler_linux.h"
-#include "dynamixel_sdk/packet_handler.h"
+#include "dynamixel_sdk.h"                                  // Uses Dynamixel SDK library
+
 
 // Control table address
 #define ADDR_MX_TORQUE_ENABLE           24                  // Control table address is different in Dynamixel model
@@ -42,14 +41,14 @@ const int DXL_ID3 = 3;
 const int BAUDRATE1 = 57600;
 const int BAUDRATE2 = 1000000;
 const int BAUDRATE3 = 1000000;
-#define DEVICENAME                      "/dev/ttyUSB0"      // Check which port is being used on your controller
+//#define DEVICENAME                      "/dev/ttyUSB0"      // Check which port is being used on your controller
 															// ex) Windows: "COM1"   Linux: "/dev/ttyUSB0" Mac: "/dev/tty.usbserial-*"
-//#define DEVICENAME                      "COM6" 
+#define DEVICENAME                      "COM11" 
 
 #define TORQUE_ENABLE                   1                   // Value for enabling the torque
 #define TORQUE_DISABLE                  0                   // Value for disabling the torque
-#define DXL_MINIMUM_POSITION_VALUE      100                 // Dynamixel will rotate between this value
-#define DXL_MAXIMUM_POSITION_VALUE      4000                // and this value (note that the Dynamixel would not move when the position value is out of movable range. Check e-manual about the range of the Dynamixel you use.)
+#define DXL_MINIMUM_POSITION_VALUE      -28672                 // Dynamixel will rotate between this value
+#define DXL_MAXIMUM_POSITION_VALUE      28672                // and this value (note that the Dynamixel would not move when the position value is out of movable range. Check e-manual about the range of the Dynamixel you use.)
 #define DXL_MOVING_STATUS_THRESHOLD     10                  // Dynamixel moving status threshold
 
 #define ESC_ASCII_VALUE                 0x1b
@@ -118,12 +117,10 @@ auto enable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHand
     if (portHandler->setBaudRate(baudrate))
     {
         std::cout << "Succeeded to change the baudrate!" << std::endl;
-        return 1;
     }
     else
     {
         std::cout << "Failed to change the baudrate!" << std::endl;
-        std::cout << "Press any key to terminate...!" << std::endl;
         getch();
         return 0;
     }
@@ -142,7 +139,6 @@ auto enable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHand
     else
     {
         std::cout << "Dynamixel " << dxl_id << " has been successfully connected" << std::endl;
-        return 1;
     }
     return 1;
 }
@@ -151,13 +147,11 @@ auto read_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandle
     uint8_t dxl_error = 0;
     if (portHandler->setBaudRate(baudrate))
     {
-        std::cout << "Succeeded to change the baudrate!" << std::endl;
-        return 1;
+        //std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
         std::cout << "Failed to change the baudrate!" << std::endl;
-        std::cout << "Press any key to terminate...!" << std::endl;
         getch();
         return 0;
     }
@@ -180,17 +174,15 @@ auto write_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandl
     uint8_t dxl_error = 0;
     if (portHandler->setBaudRate(baudrate))
     {
-        std::cout << "Succeeded to change the baudrate!" << std::endl;
-        return 1;
+        //std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
         std::cout << "Failed to change the baudrate!" << std::endl;
-        std::cout << "Press any key to terminate...!" << std::endl;
         getch();
         return 0;
     }
-    dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, dxl_id, ADDR_MX_GOAL_POSITION, target_pos*SCALING, &dxl_error);
+    dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, dxl_id, ADDR_MX_GOAL_POSITION, target_pos, &dxl_error);
     if (dxl_comm_result != COMM_SUCCESS)
     {
         printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
@@ -211,12 +203,10 @@ auto disable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHan
     if (portHandler->setBaudRate(baudrate))
     {
         std::cout << "Succeeded to change the baudrate!" << std::endl;
-        return 1;
     }
     else
     {
         std::cout << "Failed to change the baudrate!" << std::endl;
-        std::cout << "Press any key to terminate...!" << std::endl;
         getch();
         return 0;
     }
@@ -235,7 +225,6 @@ auto disable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHan
     else
     {
         std::cout << "Dynamixel " << dxl_id << " has been successfully connected" << std::endl;
-        return 1;
     }
     return 1;
 }
@@ -310,6 +299,9 @@ int main(int argc, char *argv[])
                     read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
                     read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
                     read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
+					std::cout << "pos1:" << dxl_present_position1 << std::endl;
+					std::cout << "pos2:" << dxl_present_position2 << std::endl;
+					std::cout << "pos3:" << dxl_present_position3 << std::endl;
                     target_pos1.store(dxl_present_position1);
                     target_pos2.store(dxl_present_position2);
                     target_pos3.store(dxl_present_position3);
