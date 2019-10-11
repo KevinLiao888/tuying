@@ -16,7 +16,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "dynamixel_sdk.h"                                  // Uses Dynamixel SDK library
+#include "dynamixel_sdk/dynamixel_sdk.h"                                  // Uses Dynamixel SDK library
+#include "dynamixel_sdk/port_handler_linux.h"                                  // Uses Dynamixel SDK library
 
 
 // Control table address
@@ -263,12 +264,19 @@ int main(int argc, char *argv[])
         // Initialize PortHandler instance
         // Set the port path
         // Get methods and members of PortHandlerLinux or PortHandlerWindows
+#ifdef WIN32
         dynamixel::PortHandler *portHandler = dynamixel::PortHandler::getPortHandler(DEVICENAME);
+#endif
 
+#ifdef UNIX
+        dynamixel::PortHandlerLinux *portHandler;
+        portHandler->setPortName(DEVICENAME);
+#endif
         // Initialize PacketHandler instance
         // Set the protocol version
         // Get methods and members of Protocol1PacketHandler or Protocol2PacketHandler
         dynamixel::PacketHandler *packetHandler = dynamixel::PacketHandler::getPacketHandler(PROTOCOL_VERSION);
+        //dynamixel::PacketHandler *packetHandler;
 
         int index = 0;
         int dxl_comm_result1 = COMM_TX_FAIL, dxl_comm_result2 = COMM_TX_FAIL, dxl_comm_result3 = COMM_TX_FAIL;             // Communication result
@@ -390,6 +398,7 @@ int main(int argc, char *argv[])
 	auto&cs = aris::server::ControlServer::instance();
 	auto port = argc < 2 ? 5866 : std::stoi(argv[1]);
 
+
 	//生成kaanh.xml文档	
 	//-------for qifan robot begin//
 	cs.resetController(kaanh::createControllerQifan().release());
@@ -398,12 +407,11 @@ int main(int argc, char *argv[])
 	cs.interfacePool().add<aris::server::WebInterface>("", "5866", aris::core::Socket::WEB);
 	cs.interfacePool().add<aris::server::WebInterface>("", "5867", aris::core::Socket::TCP);
 	cs.resetSensorRoot(new aris::sensor::SensorRoot);
-	cs.model().loadXmlFile(modelxmlpath.string().c_str());
+    cs.model().loadXmlFile(modelxmlpath.string().c_str());
 	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
+
 	//-------for qifan robot end// 
-
-
     /*
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
@@ -419,7 +427,7 @@ int main(int argc, char *argv[])
     */
 
 	cs.loadXmlFile(xmlpath.string().c_str());
-	
+
 	cs.start();
 
 	//加载v100的速度值//
