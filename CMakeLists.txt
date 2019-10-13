@@ -23,8 +23,8 @@ endif(WIN32)
 
 message(${aris_DIR})
 
-link_directories(/usr/local/lib)
-
+# link_directories(/usr/local/lib)
+link_directories(/home/kaanh/Desktop/Dynamixel/Dynamixel/c++/build/linux64)
 # user program started...
 set(SOURCE_FILES src/main.cpp src/kaanh.cpp src/kaanh.h)
 add_executable(tuying ${SOURCE_FILES})

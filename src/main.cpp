@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "dynamixel_sdk/dynamixel_sdk.h"                                  // Uses Dynamixel SDK library
-#include "dynamixel_sdk/port_handler_linux.h"                                  // Uses Dynamixel SDK library
+//#include "dynamixel_sdk/port_handler_linux.h"                                  // Uses Dynamixel SDK library
 
 
 // Control table address
@@ -29,19 +29,24 @@
 #define PROTOCOL_VERSION                1.0                 // See which protocol version is used in the Dynamixel
 
 // Default setting
-/*
+#define DXL_ID                          1
 #define DXL_ID1                         1                   // Dynamixel ID: 1
 #define DXL_ID2                         2 
 #define DXL_ID3                         3 
 #define BAUDRATE                        57600
+#define BAUDRATE1                       57600
 #define BAUDRATE2                       1000000
-*/
+#define BAUDRATE3                       1000000
+
+/*
 const int DXL_ID1 = 1;
 const int DXL_ID2 = 2;
 const int DXL_ID3 = 3;
+const int BAUDRATE = 57600;
 const int BAUDRATE1 = 57600;
 const int BAUDRATE2 = 1000000;
 const int BAUDRATE3 = 1000000;
+*/
 
 #ifdef UNIX
     #define DEVICENAME                      "/dev/ttyUSB0"      // Check which port is being used on your controller
@@ -268,10 +273,12 @@ int main(int argc, char *argv[])
         dynamixel::PortHandler *portHandler = dynamixel::PortHandler::getPortHandler(DEVICENAME);
 #endif
 
+
 #ifdef UNIX
-        dynamixel::PortHandlerLinux *portHandler;
-        portHandler->setPortName(DEVICENAME);
+        dynamixel::PortHandler *portHandler = dynamixel::PortHandler::getPortHandler(DEVICENAME);
+        //portHandler->getPortHandler(DEVICENAME);
 #endif
+        std::cout << "1:" << std::endl;
         // Initialize PacketHandler instance
         // Set the protocol version
         // Get methods and members of Protocol1PacketHandler or Protocol2PacketHandler
@@ -400,6 +407,7 @@ int main(int argc, char *argv[])
 
 
 	//生成kaanh.xml文档	
+    /*
 	//-------for qifan robot begin//
 	cs.resetController(kaanh::createControllerQifan().release());
 	cs.resetModel(kaanh::createModelQifan().release());
@@ -408,8 +416,9 @@ int main(int argc, char *argv[])
 	cs.interfacePool().add<aris::server::WebInterface>("", "5867", aris::core::Socket::TCP);
 	cs.resetSensorRoot(new aris::sensor::SensorRoot);
     cs.model().loadXmlFile(modelxmlpath.string().c_str());
-	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
+    cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
+    */
 
 	//-------for qifan robot end// 
     /*
@@ -425,13 +434,13 @@ int main(int argc, char *argv[])
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for rokae robot end// 
     */
+    /*
+    cs.loadXmlFile(xmlpath.string().c_str());
 
-	cs.loadXmlFile(xmlpath.string().c_str());
-
-	cs.start();
+    cs.start();
 
 	//加载v100的速度值//
-	auto &getspeed = dynamic_cast<aris::dynamic::MatrixVariable &>(*cs.model().variablePool().findByName("v100"));
+    auto &getspeed = dynamic_cast<aris::dynamic::MatrixVariable &>(*cs.model().variablePool().findByName("v100"));
 	kaanh::SpeedParam speed;
 	std::copy(getspeed.data().begin(), getspeed.data().end(), &speed.w_percent);
 	speed.w_tcp = speed.w_tcp * speed.w_percent;
@@ -442,7 +451,9 @@ int main(int argc, char *argv[])
 	
 	
 	//Receive Command//
-	cs.runCmdLine();
+    */
+    cs.runCmdLine();
+
 
 	return 0;
 }
