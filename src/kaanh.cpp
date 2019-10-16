@@ -20,7 +20,10 @@ extern std::atomic_int is_enabled;
 extern std::atomic_int target_pos1, target_pos2, target_pos3;
 extern std::atomic_int current_pos1, current_pos2, current_pos3;
 extern std::vector<std::vector<double>> dxl_pos;
-
+extern std::atomic_bool dxl_connected;	//0:未连接，1:连接
+extern std::atomic_bool dxl_enabled;	//0:未使能，1:使能
+extern std::atomic_bool dxl_auto;		//0:手动，1:自动
+extern std::atomic_int dxl_normal;		//0:异常，1:正常
 std::atomic<std::array<double, 10> > save_point;
 
 kaanh::CmdListParam cmdparam;
@@ -551,6 +554,10 @@ namespace kaanh
 		out_param.push_back(std::make_pair<std::string, std::any>("motion_state", out_data.motion_state));
 		out_param.push_back(std::make_pair<std::string, std::any>("current_plan", out_data.currentplan));
 		out_param.push_back(std::make_pair<std::string, std::any>("current_plan_id", cmdparam.current_plan_id));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl_connected", dxl_connected.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl_enabled", dxl_enabled.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl_auto", dxl_auto.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl_normal", dxl_normal.load()));
 
 		std::array<double, 10> temp = { 0,0,0,0,0,0,0,0,0,0 };
 		std::copy(out_data.motion_pos.begin(), out_data.motion_pos.end(), temp.begin());
@@ -591,6 +598,15 @@ namespace kaanh
 	};
 	auto MoveT::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
+		//当前有指令在执行//
+		auto&cs = aris::server::ControlServer::instance();
+		std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
+		if (planptr && planptr->plan.get()->name() != this->name())
+		{
+			target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION | aris::plan::Plan::Option::NOT_RUN_COLLECT_FUNCTION;
+			return;
+		}
+
 		auto c = target.controller;
 		MoveTParam param;
 		param.pos.clear();
@@ -778,11 +794,11 @@ namespace kaanh
 
 		//当前有指令在执行//
 		std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
-		if (planptr && planptr->plan != this)
+		if (planptr && planptr->plan.get()->name() != this->name())
 		{
 			throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + "Other command is running");
 		}
-		else if (planptr && planptr->plan == this)
+		else if (planptr && planptr->plan.get()->name() == this->name())
 		{
 			std::array<double, 7> temp = { 0,0,0,0,0,0,0 };
 			for (auto &p : params)
@@ -2200,7 +2216,7 @@ namespace kaanh
 		param.max_vel = 0.0;
 		param.increase_status = 0;
 		param.vel_percent = 0;
-
+		
 		for (auto &p : cmd_params)
 		{
 			if (p.first == "increase_count")
@@ -2219,7 +2235,8 @@ namespace kaanh
 
 				std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
 				//当前有指令在执行//
-				if (planptr && planptr->plan != this_p)throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + "Other command is running");
+				
+				if (planptr && planptr->plan.get()->name() != this_p->name())throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + "Other command is running");
 				if (j_count.exchange(param.increase_count))
 				{
 					target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION | aris::plan::Plan::Option::NOT_RUN_COLLECT_FUNCTION;
@@ -2245,7 +2262,7 @@ namespace kaanh
 		target.ret = ret;
 
 		param.motion_id = 0;
-
+		
 		set_jogj_input_param(this, params, target, param, param.j1_count);
 
 		target.param = param;
@@ -2942,7 +2959,7 @@ namespace kaanh
 
 				std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
 				//当前有指令在执行//
-				if (planptr && planptr->plan != this)throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + "Other command is running");
+				if (planptr && planptr->plan.get()->name() != this->name())throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + "Other command is running");
 
 				if (param.j7_count.exchange(param.increase_count))
 				{
@@ -3124,15 +3141,19 @@ namespace kaanh
 	// 1号舵机点动 //
 	auto DJ1::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
-		int step = 0;
+		int step = 0, direction = 0;
 		for (auto &p : params)
 		{
 			if (p.first == "step")
 			{
 				step = 11.378*std::stoi(p.second);
 			}	
+			else if (p.first == "direction")
+			{
+				direction = std::stoi(p.second);
+			}
 		}
-		target_pos1 += step;
+		target_pos1 += direction * step;
 
 		std::cout << "target_pos1:" << target_pos1 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
@@ -3146,6 +3167,7 @@ namespace kaanh
 			"<Command name=\"dj1\">"
 			"	<GroupParam>"
 			"		<Param name=\"step\" default=\"2\"/>"
+			"		<Param name=\"direction\" default=\"1\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -3154,15 +3176,19 @@ namespace kaanh
 	// 2号舵机点动 //
 	auto DJ2::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
-		int step = 0;
+		int step = 0, direction = 0;
 		for (auto &p : params)
 		{
 			if (p.first == "step")
 			{
 				step = 11.378*std::stoi(p.second);
 			}
+			else if (p.first == "direction")
+			{
+				direction = std::stoi(p.second);
+			}
 		}
-		target_pos2 += step;
+		target_pos2 += direction * step;
 
 		std::cout << "target_pos2:" << target_pos2 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
@@ -3176,6 +3202,7 @@ namespace kaanh
 			"<Command name=\"dj2\">"
 			"	<GroupParam>"
 			"		<Param name=\"step\" default=\"2\"/>"
+			"		<Param name=\"direction\" default=\"1\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -3184,15 +3211,19 @@ namespace kaanh
 	// 3号舵机点动 //
 	auto DJ3::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
-		int step = 0;
+		int step = 0, direction = 0;
 		for (auto &p : params)
 		{
 			if (p.first == "step")
 			{
 				step = 11.378*std::stoi(p.second);
 			}
+			else if (p.first == "direction")
+			{
+				direction = std::stoi(p.second);
+			}
 		}
-		target_pos3 += step;
+		target_pos3 += direction * step;
 
 		std::cout << "target_pos3:" << target_pos3 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
@@ -3206,6 +3237,7 @@ namespace kaanh
 			"<Command name=\"dj3\">"
 			"	<GroupParam>"
 			"		<Param name=\"step\" default=\"2\"/>"
+			"		<Param name=\"direction\" default=\"1\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -3245,9 +3277,19 @@ namespace kaanh
 			}
 		}
 
-		target_pos1.store(int(11.378*param.joint_pos_vec[0]));
-		target_pos2.store(int(11.378*param.joint_pos_vec[1]));
-		target_pos3.store(int(11.378*param.joint_pos_vec[2]));
+		if (param.joint_active_vec[0])
+		{
+			target_pos1.store(int(11.378*param.joint_pos_vec[0]));
+		}
+		if (param.joint_active_vec[1])
+		{
+			target_pos2.store(int(11.378*param.joint_pos_vec[1]));
+		}
+		if (param.joint_active_vec[2])
+		{
+			target_pos3.store(int(11.378*param.joint_pos_vec[2]));
+		}
+			
 		std::cout << "target_pos1:" << target_pos1 << std::endl;
 		std::cout << "target_pos2:" << target_pos2 << std::endl;
 		std::cout << "target_pos3:" << target_pos3 << std::endl;
@@ -3341,7 +3383,7 @@ namespace kaanh
 				std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
 
 				//当前有指令在执行//
-				if (planptr && planptr->plan != this_p)throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + "Other command is running");
+				if (planptr && planptr->plan.get()->name() != this_p->name())throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + "Other command is running");
 
 				if (j_count.exchange(param.increase_count))
 				{
