@@ -340,7 +340,7 @@ namespace kaanh
 		double min_pos = 0.0;
 		double max_vel = 1.0;	//1m/s
 		double max_acc = 5.0;	//5m/s2
-
+/*
 		std::string xml_str =
 			"<EthercatMotion phy_id=\"" + std::to_string(6) + "\" product_code=\"0x6038000D\""
 			" vendor_id=\"0x0000066F\" revision_num=\"0x00010000\" dc_assign_activate=\"0x0300\""
@@ -378,7 +378,7 @@ namespace kaanh
 			"</EthercatMotion>";
 
 		controller->slavePool().add<aris::control::EthercatMotion>().loadXmlStr(xml_str);
-
+*/
 		return controller;
 	};
 	auto createModelRokae()->std::unique_ptr<aris::dynamic::Model>
@@ -3115,6 +3115,7 @@ namespace kaanh
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
+        std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
 	}
 	auto DMode::collectNrt(PlanTarget &target)->void {}
 	DMode::DMode(const std::string &name) :Plan(name)
@@ -3136,6 +3137,7 @@ namespace kaanh
 		is_enabled.store(1);
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
+        std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
 	}
 	auto DEnable::collectNrt(PlanTarget &target)->void {}
 	DEnable::DEnable(const std::string &name) :Plan(name)
@@ -3152,6 +3154,7 @@ namespace kaanh
 		is_enabled.store(0);
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
+        std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
 	}
 	auto DDisable::collectNrt(PlanTarget &target)->void {}
 	DDisable::DDisable(const std::string &name) :Plan(name)
@@ -3186,6 +3189,7 @@ namespace kaanh
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
+        std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
 		enable_dynamixel_manual.store(1);
 	}
 	auto DJ1::collectNrt(PlanTarget &target)->void{}
@@ -3227,6 +3231,7 @@ namespace kaanh
 		std::cout << "dx_pos2:" << dx_pos2 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
+        std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
 		enable_dynamixel_manual.store(1);
 	}
 	auto DJ2::collectNrt(PlanTarget &target)->void {}
@@ -3268,6 +3273,7 @@ namespace kaanh
 		std::cout << "dx_pos3:" << dx_pos3 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
+        std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
 		enable_dynamixel_manual.store(1);
 	}
 	auto DJ3::collectNrt(PlanTarget &target)->void {}
@@ -3339,6 +3345,7 @@ namespace kaanh
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
+        std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
 		enable_dynamixel_manual.store(1);
 	}
 	auto DMoveAbsJ::collectNrt(PlanTarget &target)->void {}
