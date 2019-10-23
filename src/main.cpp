@@ -433,8 +433,8 @@ int main(int argc, char *argv[])
 
 
 	//生成kaanh.xml文档	
-	//-------for qifan robot begin//
 	/*
+	//-------for qifan robot begin//
 	cs.resetController(kaanh::createControllerQifan().release());
 	cs.resetModel(kaanh::createModelQifan().release());
 	cs.resetPlanRoot(kaanh::createPlanRootRokaeXB4().release());
@@ -444,9 +444,8 @@ int main(int argc, char *argv[])
     cs.model().loadXmlFile(modelxmlpath.string().c_str());
     cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
-	*/
 	//-------for qifan robot end// 
-
+	*/
 	
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
@@ -475,7 +474,6 @@ int main(int argc, char *argv[])
     cs.open();
 	
 	//Receive Command//
-    
     cs.runCmdLine();
 
 	return 0;

@@ -333,7 +333,7 @@ namespace kaanh
 		dynamic_cast<aris::control::EthercatSlave&>(controller->slavePool().back()).scanPdoForCurrentSlave();
 		dynamic_cast<aris::control::EthercatSlave&>(controller->slavePool().back()).setDcAssignActivate(0x00);
 #endif
-/*
+
 		double pos_offset = 0.0 / 8388608.0 * 250;	//在零位时，为500count
 		double pos_factor = 8388608.0 * 250;	//运行1m需要转250转
 		double max_pos = 10.0;
@@ -378,7 +378,7 @@ namespace kaanh
 			"</EthercatMotion>";
 
 		controller->slavePool().add<aris::control::EthercatMotion>().loadXmlStr(xml_str);
-*/
+
 		return controller;
 	};
 	auto createModelRokae()->std::unique_ptr<aris::dynamic::Model>
@@ -454,12 +454,12 @@ namespace kaanh
 		par.end_pq.resize(7, 0.0);
 		par.end_pe.resize(6, 0.0);
 		par.motion_pos.resize(10, 0.0);
-		par.motion_vel.resize(6, 0.0);
-		par.motion_acc.resize(6, 0.0);
-		par.motion_toq.resize(6, 0.0);
+		par.motion_vel.resize(7, 0.0);
+		par.motion_acc.resize(7, 0.0);
+		par.motion_toq.resize(7, 0.0);
 		par.ai.resize(100, 1.0);
 		par.di.resize(100, false);
-		par.motion_state.resize(6, 0);
+		par.motion_state.resize(7, 0);
 		std::any param = par;
 		//std::any param = std::make_any<GetParam>();
 
@@ -476,17 +476,37 @@ namespace kaanh
 			for (aris::Size i = 0; i < cs.controller().motionPool().size(); i++)
 			{
 #ifdef WIN32
-				std::any_cast<GetParam &>(data).motion_pos[i] = cs.model().motionPool()[i].mp();
-				std::any_cast<GetParam &>(data).motion_vel[i] = cs.model().motionPool()[i].mv();
-				std::any_cast<GetParam &>(data).motion_acc[i] = cs.model().motionPool()[i].ma();
-				std::any_cast<GetParam &>(data).motion_toq[i] = cs.model().motionPool()[i].ma();
+				if (i < 6)
+				{
+					std::any_cast<GetParam &>(data).motion_pos[i] = cs.model().motionPool()[i].mp();
+					std::any_cast<GetParam &>(data).motion_vel[i] = cs.model().motionPool()[i].mv();
+					std::any_cast<GetParam &>(data).motion_acc[i] = cs.model().motionPool()[i].ma();
+					std::any_cast<GetParam &>(data).motion_toq[i] = cs.model().motionPool()[i].ma();
+				}
+				else
+				{
+					std::any_cast<GetParam &>(data).motion_pos[i] = cs.controller().motionPool()[i].actualPos();
+					std::any_cast<GetParam &>(data).motion_vel[i] = cs.controller().motionPool()[i].actualVel();
+					std::any_cast<GetParam &>(data).motion_acc[i] = cs.controller().motionPool()[i].actualToq();
+					std::any_cast<GetParam &>(data).motion_toq[i] = cs.controller().motionPool()[i].actualToq();
+				}
 #endif // WIN32
 
 #ifdef UNIX
-				std::any_cast<GetParam &>(data).motion_pos[i] = cs.controller().motionPool()[i].actualPos();
-				std::any_cast<GetParam &>(data).motion_vel[i] = cs.controller().motionPool()[i].actualVel();
-				std::any_cast<GetParam &>(data).motion_acc[i] = cs.model().motionPool()[i].ma();
-				std::any_cast<GetParam &>(data).motion_toq[i] = cs.controller().motionPool()[i].actualToq();
+				if (i < 6)
+				{
+					std::any_cast<GetParam &>(data).motion_pos[i] = cs.controller().motionPool()[i].actualPos();
+					std::any_cast<GetParam &>(data).motion_vel[i] = cs.controller().motionPool()[i].actualVel();
+					std::any_cast<GetParam &>(data).motion_acc[i] = cs.model().motionPool()[i].ma();
+					std::any_cast<GetParam &>(data).motion_toq[i] = cs.controller().motionPool()[i].actualToq();
+				}
+				else
+				{
+					std::any_cast<GetParam &>(data).motion_pos[i] = cs.controller().motionPool()[i].actualPos();
+					std::any_cast<GetParam &>(data).motion_vel[i] = cs.controller().motionPool()[i].actualVel();
+					std::any_cast<GetParam &>(data).motion_acc[i] = cs.controller().motionPool()[i].actualToq();
+					std::any_cast<GetParam &>(data).motion_toq[i] = cs.controller().motionPool()[i].actualToq();
+				}
 #endif // UNIX
 			}
 			for (aris::Size i = 0; i < 100; i++)
@@ -500,7 +520,7 @@ namespace kaanh
 			ec->getLinkState(&std::any_cast<GetParam &>(data).mls, std::any_cast<GetParam &>(data).sls);
 
 			//获取motion的使能状态，0表示去使能状态，1表示使能状态//
-			for (aris::Size i = 0; i < 6; i++)
+			for (aris::Size i = 0; i < 7; i++)
 			{
 				auto cm = dynamic_cast<aris::control::EthercatMotion*>(&cs.controller().motionPool()[i]);
 				if ((cm->statusWord() & 0x6f) != 0x27)
@@ -526,12 +546,15 @@ namespace kaanh
 		auto out_data = std::any_cast<GetParam &>(param);
 		
 		//舵机//
-		out_data.motion_pos[7] = current_pos1.load();
-		out_data.motion_pos[8] = current_pos2.load();
-		out_data.motion_pos[9] = current_pos3.load();
+		//out_data.motion_pos[7] = current_pos1.load();
+		//out_data.motion_pos[8] = current_pos2.load();
+		//out_data.motion_pos[9] = current_pos3.load();
+		out_data.motion_pos[7] = target_pos1.load();
+		out_data.motion_pos[8] = target_pos2.load();
+		out_data.motion_pos[9] = target_pos3.load();
 
-		std::vector<int> slave_online(6, 0), slave_al_state(6, 0);
-		for (aris::Size i = 0; i < 6; i++)
+		std::vector<int> slave_online(7, 0), slave_al_state(7, 0);
+		for (aris::Size i = 0; i < 7; i++)
 		{
 			slave_online[i] = int(out_data.sls[i].online);
 			slave_al_state[i] = int(out_data.sls[i].al_state);
@@ -3139,6 +3162,7 @@ namespace kaanh
 	}
 
 	// 1号舵机点动 //
+	int dx_pos1 = 0, dx_pos2 = 0, dx_pos3 = 0;
 	auto DJ1::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
 		int step = 0, direction = 0;
@@ -3146,16 +3170,20 @@ namespace kaanh
 		{
 			if (p.first == "step")
 			{
-				step = 11.378*std::stoi(p.second);
+				step = 11.378*std::stod(p.second);
+				direction = std::stoi(params.at("direction"));
 			}	
-			else if (p.first == "direction")
+			else if (p.first == "stop")
 			{
-				direction = std::stoi(p.second);
+				step = 0;
 			}
 		}
-		target_pos1 += direction * step;
+		dx_pos1 += direction * step;
+		dx_pos1 = std::min(28672,std::max(dx_pos1,-28672));
+		target_pos1.store(dx_pos1);
 
-		std::cout << "target_pos1:" << target_pos1 << std::endl;
+		std::cout << "dx_pos1:" << dx_pos1 << std::endl;
+
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
 		enable_dynamixel_manual.store(1);
@@ -3165,10 +3193,13 @@ namespace kaanh
 	{
 		command().loadXmlStr(
 			"<Command name=\"dj1\">"
-			"	<GroupParam>"
-			"		<Param name=\"step\" default=\"2\"/>"
-			"		<Param name=\"direction\" default=\"1\"/>"
-			"	</GroupParam>"
+			"	<UniqueParam default=\"group\">"
+			"		<GroupParam name=\"group\">"
+			"			<Param name=\"step\" default=\"10\"/>"
+			"			<Param name=\"direction\" default=\"1\"/>"
+			"		</GroupParam>"
+			"		<Param name=\"stop\"/>"
+			"	</UniqueParam>"
 			"</Command>");
 	}
 
@@ -3181,16 +3212,19 @@ namespace kaanh
 		{
 			if (p.first == "step")
 			{
-				step = 11.378*std::stoi(p.second);
+				step = 11.378*std::stod(p.second);
+				direction = std::stoi(params.at("direction"));
 			}
-			else if (p.first == "direction")
+			else if (p.first == "stop")
 			{
-				direction = std::stoi(p.second);
+				step = 0;
 			}
 		}
-		target_pos2 += direction * step;
+		dx_pos2 += direction * step;
+		dx_pos2 = std::min(28672, std::max(dx_pos2, -28672));
+		target_pos2.store(dx_pos2);
 
-		std::cout << "target_pos2:" << target_pos2 << std::endl;
+		std::cout << "dx_pos2:" << dx_pos2 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
 		enable_dynamixel_manual.store(1);
@@ -3200,10 +3234,13 @@ namespace kaanh
 	{
 		command().loadXmlStr(
 			"<Command name=\"dj2\">"
-			"	<GroupParam>"
-			"		<Param name=\"step\" default=\"2\"/>"
-			"		<Param name=\"direction\" default=\"1\"/>"
-			"	</GroupParam>"
+			"	<UniqueParam default=\"group\">"
+			"		<GroupParam name=\"group\">"
+			"			<Param name=\"step\" default=\"1\"/>"
+			"			<Param name=\"direction\" default=\"1\"/>"
+			"		</GroupParam>"
+			"		<Param name=\"stop\"/>"
+			"	</UniqueParam>"
 			"</Command>");
 	}
 
@@ -3216,16 +3253,19 @@ namespace kaanh
 		{
 			if (p.first == "step")
 			{
-				step = 11.378*std::stoi(p.second);
+				step = 11.378*std::stod(p.second);
+				direction = std::stoi(params.at("direction"));
 			}
-			else if (p.first == "direction")
+			else if (p.first == "stop")
 			{
-				direction = std::stoi(p.second);
+				step = 0;
 			}
 		}
-		target_pos3 += direction * step;
+		dx_pos3 += direction * step;
+		dx_pos3 = std::min(28672, std::max(dx_pos3, -28672));
+		target_pos3.store(dx_pos3);
 
-		std::cout << "target_pos3:" << target_pos3 << std::endl;
+		std::cout << "dx_pos3:" << dx_pos3 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
 		enable_dynamixel_manual.store(1);
@@ -3235,10 +3275,13 @@ namespace kaanh
 	{
 		command().loadXmlStr(
 			"<Command name=\"dj3\">"
-			"	<GroupParam>"
-			"		<Param name=\"step\" default=\"2\"/>"
-			"		<Param name=\"direction\" default=\"1\"/>"
-			"	</GroupParam>"
+			"	<UniqueParam default=\"group\">"
+			"		<GroupParam name=\"group\">"
+			"			<Param name=\"step\" default=\"1\"/>"
+			"			<Param name=\"direction\" default=\"1\"/>"
+			"		</GroupParam>"
+			"		<Param name=\"stop\"/>"
+			"	</UniqueParam>"
 			"</Command>");
 	}
 
@@ -5109,7 +5152,6 @@ namespace kaanh
 
         plan_root->planPool().add<aris::plan::Enable>();
         plan_root->planPool().add<aris::plan::Disable>();
-        plan_root->planPool().add<aris::plan::Home>();
         plan_root->planPool().add<aris::plan::Mode>();
         plan_root->planPool().add<aris::plan::Show>();
         plan_root->planPool().add<aris::plan::Sleep>();
