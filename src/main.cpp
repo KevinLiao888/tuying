@@ -1,9 +1,11 @@
 ﻿#include <iostream>
 #include <aris.hpp>
 #include "kaanh.h"
-#include<atomic>
-#include<string>
-#include<filesystem>
+#include "modbus.h"
+#include "modbus_exception.h"
+#include <atomic>
+#include <string>
+#include <filesystem>
 
 
 #if defined(__linux__) || defined(__APPLE__)
@@ -280,10 +282,13 @@ const std::string uixmlfile = "interface_kaanh.xml";
 const std::string modelxmlfile = "model_rokae.xml";
 
 
+std::thread t_modbus;
+std::mutex modbus_mutex;
+
+
 int main(int argc, char *argv[])
 {
     //Start t_Dynamixel thread//
-	
     t_dynamixel = std::thread([&]()->bool
     {
         // Initialize PortHandler instance
@@ -422,7 +427,63 @@ int main(int argc, char *argv[])
         // Close port //
         portHandler->closePort();
     });
-	
+
+    //Start t_modbus thread//
+    t_modbus = std::thread([&]()->bool
+    {
+       modbus mb = modbus("192.168.1.80", 5020);
+
+       // set slave id
+       mb.modbus_set_slave_id(1);
+       std::cout<< "1" <<std::endl;
+       // connect with the server
+       try
+       {
+          mb.modbus_connect();
+       }
+       catch (std::exception &e)
+       {
+          std::cout << e.what() << std::endl;
+       }
+
+       // write multiple regs              function 0x10
+       // power on laser
+       uint16_t power_on = 1;
+       mb.modbus_write_registers(0x02, 1, &power_on);
+       // send speed to laser
+       uint16_t speed = 10;
+       //mb.modbus_write_registers(0x32, 1, &speed);
+       // start laser
+       uint16_t start = 1;
+       mb.modbus_write_registers(0x65, 1, &start);
+
+       for(int i=0; i<100; i++)
+       {
+           // read holding registers           function 0x03
+           uint16_t read_holding_regs[4];
+           mb.modbus_read_holding_registers(0x88, 4, read_holding_regs);
+
+           std::cout<< "x: " << int16_t(read_holding_regs[0]) <<std::endl;
+           std::cout<< "y: " << int16_t(read_holding_regs[1]) <<std::endl;
+           std::cout<< "z: " << int16_t(read_holding_regs[2]) <<std::endl;
+           std::cout<< "code: " << int16_t(read_holding_regs[3]) <<std::endl;
+           std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+       }
+
+       // stop laser
+       uint16_t stop = 0;
+       //mb.modbus_write_registers(0x65, 1, &stop);
+
+       // power off laser
+       uint16_t power_off = 0;
+       //mb.modbus_write_registers(0x02, 1, &power_off);
+
+       // close connection and free the memory
+       //mb.modbus_close();
+       //delete(&mb);
+       //return 0;
+    });
+
     std::cout <<"new"<<std::endl;
     xmlpath = xmlpath / xmlfile;
 	uixmlpath = uixmlpath / uixmlfile;
@@ -446,7 +507,8 @@ int main(int argc, char *argv[])
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for qifan robot end// 
 	*/
-	
+
+/*
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
 	cs.resetModel(kaanh::createModelRokae().release());
@@ -472,9 +534,12 @@ int main(int argc, char *argv[])
 
 	//Start Web Socket//
     cs.open();
-	
+*/
 	//Receive Command//
     cs.runCmdLine();
+
+    t_dynamixel.join();
+    t_modbus.join();
 
 	return 0;
 }

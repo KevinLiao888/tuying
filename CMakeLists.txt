@@ -25,7 +25,7 @@ endif(WIN32)
 message(${aris_DIR})
 
 # user program started...
-set(SOURCE_FILES src/main.cpp src/kaanh.cpp src/kaanh.h)
+set(SOURCE_FILES src/main.cpp src/kaanh.cpp src/kaanh.h src/modbus.cpp src/modbus.h src/modbus_exception.h src/example.cpp)
 add_executable(tuying ${SOURCE_FILES})
 
 

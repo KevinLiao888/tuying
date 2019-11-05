@@ -500,6 +500,7 @@ namespace kaanh
 					std::any_cast<GetParam &>(data).motion_acc[i] = cs.model().motionPool()[i].ma();
 					std::any_cast<GetParam &>(data).motion_toq[i] = cs.controller().motionPool()[i].actualToq();
 				}
+                /*
 				else
 				{
 					std::any_cast<GetParam &>(data).motion_pos[i] = cs.controller().motionPool()[i].actualPos();
@@ -507,6 +508,7 @@ namespace kaanh
 					std::any_cast<GetParam &>(data).motion_acc[i] = cs.controller().motionPool()[i].actualToq();
 					std::any_cast<GetParam &>(data).motion_toq[i] = cs.controller().motionPool()[i].actualToq();
 				}
+                */
 #endif // UNIX
 			}
 			for (aris::Size i = 0; i < 100; i++)
