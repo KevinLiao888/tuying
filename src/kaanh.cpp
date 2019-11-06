@@ -462,7 +462,7 @@ namespace kaanh
 		par.motion_state.resize(7, 0);
 		std::any param = par;
 		//std::any param = std::make_any<GetParam>();
-
+        int motion_num = 6;
 		target.server->getRtData([&](aris::server::ControlServer& cs, const aris::plan::PlanTarget *target, std::any& data)->void
 		{
 			for (aris::Size i(-1); ++i < cs.model().partPool().size();)
@@ -520,7 +520,8 @@ namespace kaanh
 			ec->getLinkState(&std::any_cast<GetParam &>(data).mls, std::any_cast<GetParam &>(data).sls);
 
 			//获取motion的使能状态，0表示去使能状态，1表示使能状态//
-			for (aris::Size i = 0; i < 7; i++)
+
+            for (aris::Size i = 0; i < motion_num; i++)
 			{
 				auto cm = dynamic_cast<aris::control::EthercatMotion*>(&cs.controller().motionPool()[i]);
 				if ((cm->statusWord() & 0x6f) != 0x27)
@@ -554,7 +555,7 @@ namespace kaanh
 		out_data.motion_pos[9] = target_pos3.load();
 
 		std::vector<int> slave_online(7, 0), slave_al_state(7, 0);
-		for (aris::Size i = 0; i < 7; i++)
+        for (aris::Size i = 0; i < motion_num; i++)
 		{
 			slave_online[i] = int(out_data.sls[i].online);
 			slave_al_state[i] = int(out_data.sls[i].al_state);
@@ -3181,6 +3182,7 @@ namespace kaanh
 				step = 0;
 			}
 		}
+        dx_pos1 = target_pos1.load();
 		dx_pos1 += direction * step;
 		dx_pos1 = std::min(28672,std::max(dx_pos1,-28672));
 		target_pos1.store(dx_pos1);
@@ -3224,6 +3226,7 @@ namespace kaanh
 				step = 0;
 			}
 		}
+        dx_pos2 = target_pos2.load();
 		dx_pos2 += direction * step;
 		dx_pos2 = std::min(28672, std::max(dx_pos2, -28672));
 		target_pos2.store(dx_pos2);
@@ -3266,6 +3269,7 @@ namespace kaanh
 				step = 0;
 			}
 		}
+        dx_pos3 = target_pos3.load();
 		dx_pos3 += direction * step;
 		dx_pos3 = std::min(28672, std::max(dx_pos3, -28672));
 		target_pos3.store(dx_pos3);
