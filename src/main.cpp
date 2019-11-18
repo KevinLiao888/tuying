@@ -288,6 +288,7 @@ std::mutex modbus_mutex;
 
 int main(int argc, char *argv[])
 {
+    /*
     //Start t_Dynamixel thread//
     t_dynamixel = std::thread([&]()->bool
     {
@@ -427,7 +428,7 @@ int main(int argc, char *argv[])
         // Close port //
         portHandler->closePort();
     });
-
+    */
     //Start t_modbus thread//
     t_modbus = std::thread([&]()->bool
     {
