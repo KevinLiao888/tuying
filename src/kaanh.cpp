@@ -2,6 +2,7 @@
 #include "kaanh.h"
 #include <array>
 #include <stdlib.h>
+#include <sys/time.h>
 
 
 using namespace aris::dynamic;
@@ -17,8 +18,8 @@ extern std::atomic_int mode_dynamixel;
 extern std::atomic_bool enable_dynamixel_auto;
 extern std::atomic_bool enable_dynamixel_manual;
 extern std::atomic_int is_enabled;
-extern std::atomic_int target_pos1, target_pos2, target_pos3;
-extern std::atomic_int current_pos1, current_pos2, current_pos3;
+extern std::atomic_int16_t target_pos1, target_pos2, target_pos3;
+extern std::atomic_int16_t current_pos1, current_pos2, current_pos3;
 extern std::vector<std::vector<double>> dxl_pos;
 extern std::atomic_bool dxl_connected;	//0:未连接，1:连接
 extern std::atomic_bool dxl_enabled;	//0:未使能，1:使能
@@ -230,7 +231,7 @@ namespace kaanh
 				controller->slavePool().add<aris::control::EthercatMotion>().loadXmlStr(xml_str);
 			}
         }
-        /*
+/*
 		double pos_offset = 500.0 / 8388608.0 * 250;	//在零位时，为500count
 		double pos_factor = 8388608.0 * 250;	//运行1m需要转250转
 		double max_pos = 10.0;
@@ -274,7 +275,7 @@ namespace kaanh
 			"</EthercatMotion>";
 
 		controller->slavePool().add<aris::control::EthercatMotion>().loadXmlStr(xml_str);
-        */
+*/
 
         return controller;
 	};
@@ -3296,6 +3297,106 @@ namespace kaanh
 	}
 
 
+    // 舵机moveabsj //
+    struct DHomeParam
+    {
+        std::vector<double> joint_pos_vec;
+        std::vector<bool> joint_active_vec;
+        const int d_num = 3;
+    };
+    auto DHome::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+    {
+        DHomeParam param;
+        int step = 0;
+        for (auto cmd_param : params)
+        {
+            if (cmd_param.first == "all")
+            {
+                param.joint_active_vec.resize(param.d_num, true);
+            }
+            else if (cmd_param.first == "motion_id")
+            {
+                param.joint_active_vec.resize(param.d_num, false);
+                param.joint_active_vec.at(std::stoi(cmd_param.second)) = true;
+            }
+            else if (cmd_param.first == "pos")
+            {
+                aris::core::Matrix mat = target.model->calculator().calculateExpression(cmd_param.second);
+                if (mat.size() == 1)param.joint_pos_vec.resize(param.d_num, mat.toDouble());
+                else
+                {
+                    param.joint_pos_vec.resize(mat.size());
+                    std::copy(mat.begin(), mat.end(), param.joint_pos_vec.begin());
+                }
+            }
+        }
+        auto cur_pos1 = target_pos1.load();
+        auto cur_pos2 = target_pos2.load();
+        auto cur_pos3 = target_pos3.load();
+        auto end_pos1 = int(11.378*param.joint_pos_vec[0]);
+        auto end_pos2 = int(11.378*param.joint_pos_vec[1]);
+        auto end_pos3 = int(11.378*param.joint_pos_vec[2]);
+
+        auto total_count = std::max(std::max(std::abs(cur_pos1-end_pos1), std::abs(cur_pos2-end_pos2)), std::abs(cur_pos3-end_pos3));
+
+        for(aris::Size i = 1; i <= total_count; i++)
+        {
+            if (param.joint_active_vec[0])
+            {
+                if(i<=std::abs(cur_pos1-end_pos1))
+                {
+                    int p1 = cur_pos1 + i*(end_pos1 - cur_pos1)/std::abs(end_pos1 - cur_pos1);
+                    p1 = std::min(28672, std::max(p1, -28672));
+                    target_pos1.store(p1);
+                }
+            }
+            if (param.joint_active_vec[1])
+            {
+                if(i<=std::abs(cur_pos2-end_pos2))
+                {
+                    int p2 = cur_pos2 + i*(end_pos2 - cur_pos2)/std::abs(end_pos2 - cur_pos2);
+                    p2 = std::min(28672, std::max(p2, -28672));
+                    target_pos2.store(p2);
+                }
+            }
+            if (param.joint_active_vec[2])
+            {
+                if(i<=std::abs(cur_pos3-end_pos3))
+                {
+                    int p3 = cur_pos3 + i*(end_pos3 - cur_pos3)/std::abs(end_pos3 - cur_pos3);
+                    p3 = std::min(28672, std::max(p3, -28672));
+                    target_pos3.store(p3);
+                }
+            }
+            enable_dynamixel_manual.store(1);
+        }
+
+
+        std::cout << "target_pos1:" << target_pos1 << std::endl;
+        std::cout << "target_pos2:" << target_pos2 << std::endl;
+        std::cout << "target_pos3:" << target_pos3 << std::endl;
+
+        std::vector<std::pair<std::string, std::any>> ret;
+        target.ret = ret;
+        std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
+        enable_dynamixel_manual.store(1);
+    }
+    auto DHome::collectNrt(PlanTarget &target)->void {}
+    DHome::DHome(const std::string &name) :Plan(name)
+    {
+        command().loadXmlStr(
+            "<Command name=\"dhome\">"
+            "	<GroupParam>"
+            "		<UniqueParam default=\"all\">"
+            "			<Param name=\"all\" abbreviation=\"a\"/>"
+            "			<Param name=\"motion_id\" abbreviation=\"m\" default=\"0\"/>"
+            "		</UniqueParam>"
+            "		<Param name=\"pos\" default=\"0\"/>"
+            "	</GroupParam>"
+            "</Command>");
+    }
+
+
 	// 舵机moveabsj //
 	struct DMoveAbsJParam
 	{
@@ -3329,19 +3430,26 @@ namespace kaanh
 				}
 			}
 		}
+        auto cur_pos1 = target_pos1.load();
+        auto cur_pos2 = target_pos2.load();
+        auto cur_pos3 = target_pos3.load();
+        auto end_pos1 = int(11.378*param.joint_pos_vec[0]);
+        auto end_pos2 = int(11.378*param.joint_pos_vec[1]);
+        auto end_pos3 = int(11.378*param.joint_pos_vec[2]);
 
-		if (param.joint_active_vec[0])
-		{
-			target_pos1.store(int(11.378*param.joint_pos_vec[0]));
-		}
-		if (param.joint_active_vec[1])
-		{
-			target_pos2.store(int(11.378*param.joint_pos_vec[1]));
-		}
-		if (param.joint_active_vec[2])
-		{
-			target_pos3.store(int(11.378*param.joint_pos_vec[2]));
-		}
+
+        if (param.joint_active_vec[0])
+        {
+            target_pos1.store(int(11.378*param.joint_pos_vec[0]));
+        }
+        if (param.joint_active_vec[1])
+        {
+            target_pos2.store(int(11.378*param.joint_pos_vec[1]));
+        }
+        if (param.joint_active_vec[2])
+        {
+            target_pos3.store(int(11.378*param.joint_pos_vec[2]));
+        }
 			
 		std::cout << "target_pos1:" << target_pos1 << std::endl;
 		std::cout << "target_pos2:" << target_pos2 << std::endl;
@@ -5169,10 +5277,10 @@ namespace kaanh
         plan_root->planPool().add<aris::plan::Recover>();
         auto &rs = plan_root->planPool().add<aris::plan::Reset>();
         //for qifan robot//
-        rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
+        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
 
         //for rokae robot//
-        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
+        rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
 
         plan_root->planPool().add<aris::plan::MoveAbsJ>();
         plan_root->planPool().add<aris::plan::MoveL>();
@@ -5204,6 +5312,7 @@ namespace kaanh
 		plan_root->planPool().add<kaanh::DJ2>();
 		plan_root->planPool().add<kaanh::DJ3>();
 		plan_root->planPool().add<kaanh::DMoveAbsJ>();
+        plan_root->planPool().add<kaanh::DHome>();
 		plan_root->planPool().add<kaanh::JX>();
 		plan_root->planPool().add<kaanh::JY>();
 		plan_root->planPool().add<kaanh::JZ>();

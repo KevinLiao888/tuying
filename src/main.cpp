@@ -71,8 +71,8 @@ std::atomic_int mode_dynamixel = 2;		//mode_dynamixel——0:manual, 1:auto, 2:N
 std::atomic_bool enable_dynamixel_auto = false;		//enable_dynamixel_auto——0:disable dynamixel auto, 1:enable dynamixel auto
 std::atomic_bool enable_dynamixel_manual = false;		//enable_dynamixel_manual——0:disable dynamixel manual, 1:enable dynamixel manual
 std::atomic_int is_enabled = 2;		//is_enabled——0:disable, 1:enable, 2:NA
-std::atomic_int target_pos1 = 0, target_pos2 = 0, target_pos3 = 0;
-std::atomic_int current_pos1 = 0, current_pos2 = 0, current_pos3 = 0;
+std::atomic_int16_t target_pos1 = 0, target_pos2 = 0, target_pos3 = 0;
+std::atomic_int16_t current_pos1 = 0, current_pos2 = 0, current_pos3 = 0;
 std::vector<std::vector<double>> dxl_pos;
 //state code//
 std::atomic_bool dxl_connected = 0;	//0:未连接，1:连接
@@ -283,7 +283,6 @@ const std::string modelxmlfile = "model_rokae.xml";
 int main(int argc, char *argv[])
 {
     //Start t_Dynamixel thread//
-	
     t_dynamixel = std::thread([&]()->bool
     {
         // Initialize PortHandler instance
@@ -433,7 +432,7 @@ int main(int argc, char *argv[])
 
 
 	//生成kaanh.xml文档	
-	/*
+    /*
 	//-------for qifan robot begin//
 	cs.resetController(kaanh::createControllerQifan().release());
 	cs.resetModel(kaanh::createModelQifan().release());
@@ -445,8 +444,8 @@ int main(int argc, char *argv[])
     cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for qifan robot end// 
-	*/
-	
+    */
+
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
 	cs.resetModel(kaanh::createModelRokae().release());
@@ -458,7 +457,8 @@ int main(int argc, char *argv[])
 	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for rokae robot end// 
-    
+
+
     cs.loadXmlFile(xmlpath.string().c_str());
 
     cs.start();
