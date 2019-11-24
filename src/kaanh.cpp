@@ -2,7 +2,10 @@
 #include "kaanh.h"
 #include <array>
 #include <stdlib.h>
+#include <numeric>
+#ifdef UNIX
 #include <sys/time.h>
+#endif // UNIX
 
 
 using namespace aris::dynamic;
@@ -788,8 +791,291 @@ namespace kaanh
 		command().loadXmlStr(
             "<Command name=\"movet\">"
 			"	<GroupParam>"
-			"		<Param name=\"col\" default=\"7\"/>"
-			"		<Param name=\"path\" default=\"C:\\Users\\kevin\\Desktop\\tuying\\example.emily\"/>"
+			"		<Param name=\"col\" default=\"9\"/>"
+			"		<Param name=\"path\" default=\"C:\\Users\\kevin\\Desktop\\tuying\\tuying\\output.emily\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 执行emily文件 //
+	struct MoveEParam
+	{
+		std::vector<std::vector<double>> pos;
+		std::vector<std::vector<double>> target_pos;
+		std::vector<std::vector<double>> temp_pos;
+		std::vector<bool> active;
+		std::int16_t col;
+		double ratio;
+	};
+	bool splitString(std::string spCharacter, const std::string& objString, std::vector<bool>& stringVector)
+	{
+		if (objString.length() == 0)
+		{
+			THROW_FILE_LINE("the ACTIVE_AXIS is NULL");
+			return false;
+		}
+		size_t posBegin = 0;
+		size_t posEnd = 0;
+
+		while (posEnd != std::string::npos)
+		{
+			posBegin = posEnd;
+			posEnd = objString.find(spCharacter, posBegin);
+
+			if (posBegin == posEnd)
+			{
+				posEnd += spCharacter.size();
+				continue;
+			}
+			if (posEnd == std::string::npos)
+			{
+				break;
+			}
+			std::string str = objString.substr(posBegin, posEnd - posBegin);
+			stringVector.push_back(std::stoi(str));
+			posEnd += spCharacter.size();
+		}
+		return true;
+	}
+	auto MoveE::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		//当前有指令在执行//
+		auto&cs = aris::server::ControlServer::instance();
+		std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
+		if (planptr && planptr->plan.get()->name() != this->name())
+		{
+			target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION | aris::plan::Plan::Option::NOT_RUN_COLLECT_FUNCTION;
+			return;
+		}
+
+		auto c = target.controller;
+		MoveEParam param;
+		param.active.clear();
+		param.pos.clear();
+		param.target_pos.clear();
+		param.temp_pos.clear();
+		param.pos.resize(7);
+		param.target_pos.resize(7);
+		std::ifstream infile;
+
+		for (auto cmd_param : params)
+		{
+			if (cmd_param.first == "col")
+			{
+				param.col = std::stoi(cmd_param.second);
+			}
+			else if (cmd_param.first == "path")
+			{
+				std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
+				dxl_pos.clear();
+				dxl_pos.resize(3);
+				auto path = cmd_param.second;
+				infile.open(path);
+				//检查读取文件是否成功//
+				if (!infile)throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " fail to open the file");
+				//解析log文件//
+				std::string data;
+				while (std::getline(infile, data))
+				{
+					if (data.find("[HEADER]") != std::string::npos)
+					{
+						continue;
+					}
+					if (data.find("GEAR_NOMINAL_VEL") != std::string::npos)
+					{
+						std::string split = "=";
+						// 以‘=’为分隔符拆分字符串
+						auto vel_pos = data.find(split);
+						auto sp_vel = data.substr(vel_pos + 1);
+						std::string vel = sp_vel;
+						param.ratio = std::stod(vel) / 1.0;
+						std::cout << "ratio:" << param.ratio << std::endl;
+						continue;
+					}
+					if (data.find("ACTIVE_AXIS") != std::string::npos)
+					{
+						std::string split = "= ";
+						// 以‘= ’为分隔符拆分字符串
+						auto axis_pos = data.find(split);
+						auto axis_string = data.substr(axis_pos + 1);
+						std::string axis_split = ",";
+						splitString(axis_split, axis_string, param.active);
+						std::cout << "active size:" << param.active.size() << std::endl;
+						continue;
+					}
+					if (data.find("[RECORDS]") != std::string::npos)
+					{
+						continue;
+					}
+					if (data.find("[END]") != std::string::npos)
+					{
+						break;
+					}
+					param.temp_pos.resize(std::accumulate(param.active.begin(), param.active.end(), 0) + 1);
+					char *s_input = (char *)data.c_str();
+					const char *split = "  ";
+					// 以‘ ’为分隔符拆分字符串//
+					char *sp_input = strtok(s_input, split);
+
+					double data_input;
+					int i = 0;
+					while (sp_input != NULL)
+					{
+						data_input = atof(sp_input);
+						param.temp_pos[i++].push_back(data_input);
+						sp_input = strtok(NULL, split);
+						continue;
+					}
+					if (s_input != NULL)
+					{
+						s_input = NULL;
+					}
+					delete(sp_input);
+					sp_input = NULL;
+				}
+
+				//数据提取//
+				int pos_count = 1, dxl_count = 0;
+				for (int k = 0; k < param.active.size(); k++)
+				{
+					if (k <= 6)
+					{
+						if (param.active[k])
+						{
+							param.pos[k].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
+							pos_count++;
+						}
+					}
+					if (k > 6)
+					{
+						if (param.active[k])
+						{
+							dxl_pos[dxl_count].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
+							pos_count++;
+							dxl_count++;
+						}
+					}
+				}
+
+				//对机械臂以及外部轴数据进行插值//
+				for (int i = 0; i < param.pos.size(); i++)
+				{
+					if (!param.pos[i].empty())
+					{
+						for (int j = 0; j < param.pos[i].size() - 1; j++)
+						{
+							for (double count = param.temp_pos[0][j]; count < param.temp_pos[0][j + 1]; count = count + 0.001*param.ratio)
+							{
+								param.target_pos[i].push_back(interpolate(param.temp_pos[0][j], param.temp_pos[0][j + 1], param.pos[i][j], param.pos[i][j + 1], count)* PI / 180.0);
+							}
+						}
+					}
+				}
+				infile.close();
+			}
+		}
+		target.param = param;
+
+		for (int j = 0; j < param.target_pos.size(); j++)
+		{
+			for (int i = 0; i < 41; i++)
+			{
+				std::cout << param.target_pos[j][i] << "  ";
+			}
+			std::cout << std::endl;
+		}
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+		std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::USE_TARGET_POS | Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER);
+
+		// 使能舵机emily功能 //
+		enable_dynamixel_auto.store(true);
+	}
+	auto MoveE::executeRT(PlanTarget &target)->int
+	{
+		auto &param = std::any_cast<MoveEParam&>(target.param);
+		auto controller = target.controller;
+		static aris::Size total_count = 1;
+
+#ifdef WIN32
+		for (int i = 0; i < target.model->motionPool().size(); i++)
+		{
+			if (!param.target_pos[i].empty())
+			{
+				target.model->motionPool().at(i).setMp(param.target_pos[i + 1][target.count]);
+			}
+			total_count = std::max(param.target_pos[i].size(), total_count);
+		}
+		if (target.model->solverPool().at(1).kinPos())return -1;
+
+		// 打印 //
+		auto &cout = controller->mout();
+		if (target.count % 1000 == 0)
+		{
+			for (Size i = 0; i < controller->motionPool().size(); i++)
+			{
+				cout << target.model->motionPool().at(i).mp() << "  ";
+			}
+			cout << std::endl;
+		}
+		// log //
+		auto &lout = controller->lout();
+		for (Size i = 0; i < controller->motionPool().size(); ++i)
+		{
+			for (Size i = 0; i < controller->motionPool().size(); i++)
+			{
+				lout << target.model->motionPool().at(i).mp() << "  ";
+			}
+			lout << std::endl;
+		}
+
+#endif // WIN32
+
+#ifdef UNIX
+		for (int i = 0; i < controller->motionPool().size(); i++)
+		{
+			if (!param.target_pos[i].empty())
+			{
+				controller->motionPool()[i].setTargetPos(param.target_pos[i + 1][target.count]);
+			}
+			total_count = std::max(param.target_pos[i].size(), total_count);
+		}
+		if (target.model->solverPool().at(1).kinPos())return -1;
+
+		// 打印 //
+		auto &cout = controller->mout();
+		if (target.count % 100 == 0)
+		{
+			for (Size i = 0; i < controller->motionPool().size(); i++)
+			{
+				cout << controller->motionPool()[i].actualPos() << "  ";
+			}
+			cout << std::endl;
+		}
+		// log //
+		auto &lout = controller->lout();
+		for (Size i = 0; i < controller->motionPool().size(); ++i)
+		{
+			for (Size i = 0; i < controller->motionPool().size(); i++)
+			{
+				lout << controller->motionPool()[i].actualPos() << "  ";
+			}
+			lout << std::endl;
+		}
+#endif // UNIX
+		
+		return total_count - target.count - 1;
+	}
+	auto MoveE::collectNrt(PlanTarget &target)->void {}
+	MoveE::MoveE(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"mve\">"
+			"	<GroupParam>"
+			"		<Param name=\"col\" default=\"9\"/>"
+			"		<Param name=\"path\" default=\"C:\\Users\\kevin\\Desktop\\tuying\\tuying\\output.emily\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -5294,6 +5580,7 @@ namespace kaanh
 		plan_root->planPool().add<kaanh::Get>();
 		plan_root->planPool().add<kaanh::MoveAbJ>();
 		plan_root->planPool().add<kaanh::MoveT>();
+		plan_root->planPool().add<kaanh::MoveE>();
 		plan_root->planPool().add<kaanh::MoveJM>();
 		plan_root->planPool().add<kaanh::MoveC>();
 		plan_root->planPool().add<kaanh::JogC>();

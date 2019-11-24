@@ -84,6 +84,17 @@ namespace kaanh
 		ARIS_REGISTER_TYPE(MoveT);
 	};
 
+	class MoveE : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual executeRT(aris::plan::PlanTarget &target)->int;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+
+		explicit MoveE(const std::string &name = "MoveE_plan");
+		ARIS_REGISTER_TYPE(MoveE);
+	};
+
 	class MoveAbJ : public aris::plan::Plan
 	{
 	public:
