@@ -383,17 +383,27 @@ int main(int argc, char *argv[])
                         if (enable_dynamixel_auto.exchange(false))
                         {
                             std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
+							bool dxl1_active = !dxl_pos[0].empty(), dxl2_active = !dxl_pos[1].empty(), dxl3_active = !dxl_pos[2].empty();
                             for (int i = 0; i < dxl_pos[0].size(); i++)
                             {
-                                write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_pos[0][i]);
-                                write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_pos[1][i]);
-                                write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_pos[2][i]);
-                                read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
-                                read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
-                                read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
-                                current_pos1.store(dxl_present_position1 / SCALING);
-                                current_pos2.store(dxl_present_position2 / SCALING);
-                                current_pos3.store(dxl_present_position3 / SCALING);
+								if (dxl1_active)
+								{
+									write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_pos[0][i]);
+									read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+									current_pos1.store(dxl_present_position1 / SCALING);
+								}
+								if (dxl2_active)
+								{
+									write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_pos[1][i]);
+									read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
+									current_pos2.store(dxl_present_position2 / SCALING);
+								}
+								if (dxl3_active)
+								{
+									write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_pos[2][i]);
+									read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
+									current_pos3.store(dxl_present_position3 / SCALING);
+								}
                                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                             }
                         }
