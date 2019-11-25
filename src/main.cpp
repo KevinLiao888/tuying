@@ -384,7 +384,8 @@ int main(int argc, char *argv[])
                         {
                             std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
 							bool dxl1_active = !dxl_pos[0].empty(), dxl2_active = !dxl_pos[1].empty(), dxl3_active = !dxl_pos[2].empty();
-                            for (int i = 0; i < dxl_pos[0].size(); i++)
+							auto data_length = std::max(std::max(dxl_pos[0].size(), dxl_pos[1].size()), dxl_pos[2].size());
+                            for (int i = 0; i < data_length; i++)
                             {
 								if (dxl1_active)
 								{

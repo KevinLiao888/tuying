@@ -29,6 +29,7 @@ extern std::atomic_bool dxl_enabled;	//0:未使能，1:使能
 extern std::atomic_bool dxl_auto;		//0:手动，1:自动
 extern std::atomic_int dxl_normal;		//0:异常，1:正常
 std::atomic<std::array<double, 10> > save_point;
+std::atomic_int xbox_mode = 0;			//0:未指定，1:关节，2:末端，3:舵机
 
 kaanh::CmdListParam cmdparam;
 
@@ -551,12 +552,12 @@ namespace kaanh
 		auto out_data = std::any_cast<GetParam &>(param);
 		
 		//舵机//
-		//out_data.motion_pos[7] = current_pos1.load();
-		//out_data.motion_pos[8] = current_pos2.load();
-		//out_data.motion_pos[9] = current_pos3.load();
-		out_data.motion_pos[7] = target_pos1.load();
-		out_data.motion_pos[8] = target_pos2.load();
-		out_data.motion_pos[9] = target_pos3.load();
+		out_data.motion_pos[7] = current_pos1.load();
+		out_data.motion_pos[8] = current_pos2.load();
+		out_data.motion_pos[9] = current_pos3.load();
+		//out_data.motion_pos[7] = target_pos1.load();
+		//out_data.motion_pos[8] = target_pos2.load();
+		//out_data.motion_pos[9] = target_pos3.load();
 
 		std::vector<int> slave_online(7, 0), slave_al_state(7, 0);
         for (aris::Size i = 0; i < motion_num; i++)
@@ -586,6 +587,7 @@ namespace kaanh
 		out_param.push_back(std::make_pair<std::string, std::any>("dxl_enabled", dxl_enabled.load()));
 		out_param.push_back(std::make_pair<std::string, std::any>("dxl_auto", dxl_auto.load()));
 		out_param.push_back(std::make_pair<std::string, std::any>("dxl_normal", dxl_normal.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("xbox_mode", xbox_mode.load()));
 
 		std::array<double, 10> temp = { 0,0,0,0,0,0,0,0,0,0 };
 		std::copy(out_data.motion_pos.begin(), out_data.motion_pos.end(), temp.begin());
@@ -3390,6 +3392,33 @@ namespace kaanh
 	}
 
 
+	// 手柄控制目标 //
+	auto Xbox::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		for (auto &p : params)
+		{
+			if (p.first == "mode")
+			{
+				xbox_mode.store(std::stoi(p.second));
+			}
+		}
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+		std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
+	}
+	auto Xbox::collectNrt(PlanTarget &target)->void {}
+	Xbox::Xbox(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"xbox\">"
+			"	<GroupParam>"
+			"		<Param name=\"mode\" default=\"0\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
 	// 切换舵机模式 //
 	auto DMode::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
@@ -3665,7 +3694,7 @@ namespace kaanh
         std::vector<std::pair<std::string, std::any>> ret;
         target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
-        enable_dynamixel_manual.store(1);
+        //enable_dynamixel_manual.store(1);
     }
     auto DHome::collectNrt(PlanTarget &target)->void {}
     DHome::DHome(const std::string &name) :Plan(name)
@@ -5592,6 +5621,7 @@ namespace kaanh
 		plan_root->planPool().add<kaanh::JogJ5>();
 		plan_root->planPool().add<kaanh::JogJ6>();
 		plan_root->planPool().add<kaanh::JogJ7>();
+		plan_root->planPool().add<kaanh::Xbox>();
 		plan_root->planPool().add<kaanh::DMode>();
         plan_root->planPool().add<kaanh::DEnable>();
         plan_root->planPool().add<kaanh::DDisable>();
