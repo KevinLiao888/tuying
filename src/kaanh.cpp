@@ -975,20 +975,20 @@ namespace kaanh
 				infile.close();
 			}
 		}
-		target.param = param;
 
 		for (int j = 0; j < param.target_pos.size(); j++)
 		{
-			for (int i = 0; i < 41; i++)
+            for (int i = 0; i < 13; i++)
 			{
 				std::cout << param.target_pos[j][i] << "  ";
 			}
 			std::cout << std::endl;
 		}
 
+        target.param = param;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
-		std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::USE_TARGET_POS | Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER);
+        std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER);
 
 		// 使能舵机emily功能 //
 		enable_dynamixel_auto.store(true);
@@ -1004,7 +1004,7 @@ namespace kaanh
 		{
 			if (!param.target_pos[i].empty())
 			{
-				target.model->motionPool().at(i).setMp(param.target_pos[i + 1][target.count]);
+                target.model->motionPool().at(i).setMp(param.target_pos[i][target.count]);
 			}
 			total_count = std::max(param.target_pos[i].size(), total_count);
 		}
@@ -1038,7 +1038,7 @@ namespace kaanh
 		{
 			if (!param.target_pos[i].empty())
 			{
-				controller->motionPool()[i].setTargetPos(param.target_pos[i + 1][target.count]);
+                controller->motionPool()[i].setTargetPos(param.target_pos[i][target.count]);
 			}
 			total_count = std::max(param.target_pos[i].size(), total_count);
 		}
@@ -1075,7 +1075,7 @@ namespace kaanh
 			"<Command name=\"mve\">"
 			"	<GroupParam>"
 			"		<Param name=\"col\" default=\"9\"/>"
-			"		<Param name=\"path\" default=\"C:\\Users\\kevin\\Desktop\\tuying\\tuying\\output.emily\"/>"
+            "		<Param name=\"path\" default=\"/home/kaanh/Desktop/tuying/output.emily\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
