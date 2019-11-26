@@ -237,11 +237,11 @@ namespace kaanh
         }
 /*
 		double pos_offset = 500.0 / 8388608.0 * 250;	//在零位时，为500count
-		double pos_factor = 8388608.0 * 250;	//运行1m需要转250转
-		double max_pos = 10.0;
-		double min_pos = 0.0;
-		double max_vel = 1.0;	//1m/s
-		double max_acc = 5.0;	//5m/s2
+		double pos_factor = 8388608.0 * 16.07;	//电机运行一圈，导轨运行62.22mm，即导轨运行1m需要转16.07转
+		double max_pos = 1.5;
+		double min_pos = -1.5;
+		double max_vel = 0.1;	//0.1m/s
+		double max_acc = 1.0;	//1.0m/s2
 		std::string xml_str =
 			"<EthercatMotion phy_id=\"" + std::to_string(6) + "\" product_code=\"0x6038000D\""
 			" vendor_id=\"0x0000066F\" revision_num=\"0x00010000\" dc_assign_activate=\"0x0300\""
@@ -1036,6 +1036,7 @@ namespace kaanh
 #endif // WIN32
 
 #ifdef UNIX
+		//线性插值轨迹//
 		for (int i = 0; i < controller->motionPool().size(); i++)
 		{
 			if (!param.target_pos[i].empty())
