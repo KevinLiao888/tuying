@@ -4,6 +4,7 @@
 #include<atomic>
 #include<string>
 #include<filesystem>
+#include<sys/time.h>
 
 
 #if defined(__linux__) || defined(__APPLE__)
@@ -63,10 +64,12 @@ const int BAUDRATE3 = 1000000;
 #define DXL_MOVING_STATUS_THRESHOLD     10                  // Dynamixel moving status threshold
 
 #define ESC_ASCII_VALUE                 0x1b
-#define SCALING                         11
+#define SCALING                         11.378
 
 std::thread t_dynamixel;
 std::mutex dynamixel_mutex;
+
+std::atomic_int syn_clock = 0;
 std::atomic_int mode_dynamixel = 2;		//mode_dynamixel——0:manual, 1:auto, 2:NA
 std::atomic_bool enable_dynamixel_auto = false;		//enable_dynamixel_auto——0:disable dynamixel auto, 1:enable dynamixel auto
 std::atomic_bool enable_dynamixel_manual = false;		//enable_dynamixel_manual——0:disable dynamixel manual, 1:enable dynamixel manual
@@ -324,6 +327,8 @@ int main(int argc, char *argv[])
             return 0;
         }
 
+        struct timeval tv;
+
         while (1)
         {
             auto en = is_enabled.load();
@@ -335,17 +340,20 @@ int main(int argc, char *argv[])
                 if (en == 1)
                 {
                     if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1))return 0;
-                    if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
-                    if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))return 0;
+                    //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
+                    //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))return 0;
                     read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
-                    read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
-                    read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
+                    //read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
+                    //read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
+                    dxl_present_position1 = std::int16_t(dxl_present_position1);
+                    dxl_present_position2 = std::int16_t(dxl_present_position2);
+                    dxl_present_position3 = std::int16_t(dxl_present_position3);
 					std::cout << "pos1:" << dxl_present_position1 << std::endl;
 					std::cout << "pos2:" << dxl_present_position2 << std::endl;
-					std::cout << "pos3:" << dxl_present_position3 << std::endl;
+                    std::cout << "pos3:" << dxl_present_position3 << std::endl;
                     target_pos1.store(dxl_present_position1);
-                    target_pos2.store(dxl_present_position2);
-                    target_pos3.store(dxl_present_position3);
+                    //target_pos2.store(dxl_present_position2);
+                    //target_pos3.store(dxl_present_position3);
                     is_enabled.store(2);
                     enabled = true;
 					dxl_enabled.store(true);
@@ -354,8 +362,8 @@ int main(int argc, char *argv[])
                 else if (en == 0)
                 {
                     if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1))return 0;
-                    if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
-                    if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))return 0;
+                    //if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
+                    //if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))return 0;
                     is_enabled.store(2);
                     enabled = false;
 					dxl_enabled.store(false);
@@ -369,11 +377,11 @@ int main(int argc, char *argv[])
                         if (enable_dynamixel_manual.exchange(false))
                         {
                             auto pos1 = target_pos1.load();
-                            auto pos2 = target_pos2.load();
-                            auto pos3 = target_pos3.load();
+                            //auto pos2 = target_pos2.load();
+                            //auto pos3 = target_pos3.load();
                             write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, pos1);
-                            write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, pos2);
-                            write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, pos3);
+                            //write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, pos2);
+                           //write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, pos3);
                         }
                     }
                     // auto mode //
@@ -385,27 +393,42 @@ int main(int argc, char *argv[])
                             std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
 							bool dxl1_active = !dxl_pos[0].empty(), dxl2_active = !dxl_pos[1].empty(), dxl3_active = !dxl_pos[2].empty();
 							auto data_length = std::max(std::max(dxl_pos[0].size(), dxl_pos[1].size()), dxl_pos[2].size());
-                            for (int i = 0; i < data_length; i++)
+                            static int dxl_couter;
+                            dxl_couter = 0;
+                            while(1)
                             {
-								if (dxl1_active)
-								{
-									write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_pos[0][i]);
-									read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
-									current_pos1.store(dxl_present_position1 / SCALING);
-								}
-								if (dxl2_active)
-								{
-									write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_pos[1][i]);
-									read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
-									current_pos2.store(dxl_present_position2 / SCALING);
-								}
-								if (dxl3_active)
-								{
-									write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_pos[2][i]);
-									read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
-									current_pos3.store(dxl_present_position3 / SCALING);
-								}
-                                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                                if(dxl_couter>=data_length-1) break;
+                                if(syn_clock.load() ==0)
+                                {
+                                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                                     continue;
+                                }
+                                if(syn_clock.load()>0)
+                                  {
+                                      if (dxl1_active)
+                                      {
+                                          write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_pos[0][dxl_couter]);
+                                          read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+                                          auto dxl1 = std::int16_t(dxl_present_position1);
+                                          current_pos1.store(1.0*dxl1 / SCALING);
+                                      }
+                                      if (dxl2_active)
+                                      {
+                                          write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_pos[1][dxl_couter]);
+                                          read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
+                                          auto dxl2 = std::int16_t(dxl_present_position2);
+                                          current_pos2.store(1.0*dxl2 / SCALING);
+                                      }
+                                      if (dxl3_active)
+                                      {
+                                          write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_pos[2][dxl_couter]);
+                                          read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
+                                          auto dxl3 = std::int16_t(dxl_present_position3);
+                                          current_pos3.store(1.0*dxl3 / SCALING);
+                                      }
+                                    syn_clock--;
+                                    dxl_couter++;
+                                  }
                             }
                         }
                         else {}
@@ -413,11 +436,14 @@ int main(int argc, char *argv[])
 
                     // Read the position of dynamixel1, dynamixel2, dynamixel3 //
                     read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
-                    read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
-                    read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
-                    current_pos1.store(dxl_present_position1 / SCALING);
-                    current_pos2.store(dxl_present_position2 / SCALING);
-                    current_pos3.store(dxl_present_position3 / SCALING);
+                    //read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
+                    //read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
+                    auto dxl1 = std::int16_t(dxl_present_position1);
+                    auto dxl2 = std::int16_t(dxl_present_position2);
+                    auto dxl3 = std::int16_t(dxl_present_position3);
+                    current_pos1.store(1.0*dxl1 / SCALING);
+                    //current_pos2.store(1.0*dxl2 / SCALING);
+                    //current_pos3.store(1.0*dxl3 / SCALING);
                 }
             }
             catch (std::exception &e)
@@ -443,20 +469,23 @@ int main(int argc, char *argv[])
 
 
 	//生成kaanh.xml文档	
-    /*
+
 	//-------for qifan robot begin//
 	cs.resetController(kaanh::createControllerQifan().release());
 	cs.resetModel(kaanh::createModelQifan().release());
 	cs.resetPlanRoot(kaanh::createPlanRootRokaeXB4().release());
 	cs.interfacePool().add<aris::server::WebInterface>("", "5866", aris::core::Socket::WEB);
 	cs.interfacePool().add<aris::server::WebInterface>("", "5867", aris::core::Socket::TCP);
+    cs.interfacePool().add<aris::server::WebInterface>("", "5868", aris::core::Socket::TCP);
+    cs.interfacePool().add<aris::server::WebInterface>("", "5869", aris::core::Socket::TCP);
 	cs.resetSensorRoot(new aris::sensor::SensorRoot);
     cs.model().loadXmlFile(modelxmlpath.string().c_str());
     cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for qifan robot end// 
-    */
 
+
+    /*
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
 	cs.resetModel(kaanh::createModelRokae().release());
@@ -468,7 +497,7 @@ int main(int argc, char *argv[])
 	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for rokae robot end// 
-
+    */
 
     cs.loadXmlFile(xmlpath.string().c_str());
 
