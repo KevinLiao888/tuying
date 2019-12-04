@@ -4,7 +4,7 @@
 #include<atomic>
 #include<string>
 #include<filesystem>
-#include<sys/time.h>
+//#include<sys/time.h>
 
 
 #if defined(__linux__) || defined(__APPLE__)
@@ -54,7 +54,7 @@ const int BAUDRATE3 = 1000000;
 #endif
 
 #ifdef WIN32
-    #define DEVICENAME                      "COM11"
+    #define DEVICENAME                      "COM6"
 #endif
 
 #define TORQUE_ENABLE                   1                   // Value for enabling the torque
@@ -326,8 +326,6 @@ int main(int argc, char *argv[])
             getch();
             return 0;
         }
-
-        struct timeval tv;
 
         while (1)
         {

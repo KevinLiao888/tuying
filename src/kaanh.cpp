@@ -1030,12 +1030,12 @@ namespace kaanh
 						{
 							dxl_pos[dxl_count].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
 							pos_count++;
-							dxl_count++;
 						}
+						dxl_count++;
 					}
 				}
 
-
+				//导轨数值除以1000，单位有mm换算成m
                 for(int m=0; m<param.pos[6].size(); m++)
                 {
                     param.pos[6][m] = (param.pos[6][m])/1000.0;
@@ -3612,7 +3612,7 @@ namespace kaanh
 			"<Command name=\"dj1\">"
 			"	<UniqueParam default=\"group\">"
 			"		<GroupParam name=\"group\">"
-			"			<Param name=\"step\" default=\"10\"/>"
+			"			<Param name=\"step\" default=\"2\"/>"
 			"			<Param name=\"direction\" default=\"1\"/>"
 			"		</GroupParam>"
 			"		<Param name=\"stop\"/>"
@@ -3655,7 +3655,7 @@ namespace kaanh
 			"<Command name=\"dj2\">"
 			"	<UniqueParam default=\"group\">"
 			"		<GroupParam name=\"group\">"
-			"			<Param name=\"step\" default=\"1\"/>"
+			"			<Param name=\"step\" default=\"2\"/>"
 			"			<Param name=\"direction\" default=\"1\"/>"
 			"		</GroupParam>"
 			"		<Param name=\"stop\"/>"
@@ -3698,7 +3698,7 @@ namespace kaanh
 			"<Command name=\"dj3\">"
 			"	<UniqueParam default=\"group\">"
 			"		<GroupParam name=\"group\">"
-			"			<Param name=\"step\" default=\"1\"/>"
+			"			<Param name=\"step\" default=\"2\"/>"
 			"			<Param name=\"direction\" default=\"1\"/>"
 			"		</GroupParam>"
 			"		<Param name=\"stop\"/>"
