@@ -4,7 +4,7 @@
 #include<atomic>
 #include<string>
 #include<filesystem>
-//#include<sys/time.h>
+#include<chrono>
 
 
 #if defined(__linux__) || defined(__APPLE__)
@@ -135,135 +135,143 @@ int kbhit(void)
 auto enable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandler *packetHandler, int dxl_comm_result, const int dxl_id, const int baudrate)->bool
 {
     uint8_t dxl_error = 0;
+    uint16_t state = 1;
     // Set port baudrate for Dynamixel
     if (portHandler->setBaudRate(baudrate))
     {
-        std::cout << "Succeeded to change the baudrate!" << std::endl;
+        state = 1;
+        //std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
-        std::cout << "Failed to change the baudrate!" << std::endl;
+        //std::cout << "Failed to change the baudrate!" << std::endl;
         getch();
-		dxl_normal.store(0);
+        state = 0;
         return 0;
     }
     // Enable Dynamixel Torque
     dxl_comm_result = packetHandler->write1ByteTxRx(portHandler, dxl_id, ADDR_MX_TORQUE_ENABLE, TORQUE_ENABLE, &dxl_error);
     if (dxl_comm_result != COMM_SUCCESS)
     {
-        std::cout << packetHandler->getTxRxResult(dxl_comm_result) << std::endl;
-		dxl_normal.store(0);
+        //std::cout << packetHandler->getTxRxResult(dxl_comm_result) << std::endl;
+        state = 0;
         return 0;
     }
     else if (dxl_error != 0)
     {
-        std::cout << packetHandler->getRxPacketError(dxl_error) << std::endl;
-		dxl_normal.store(0);
+        //std::cout << packetHandler->getRxPacketError(dxl_error) << std::endl;
+        state = 0;
         return 0;
     }
     else
     {
-        std::cout << "Dynamixel " << dxl_id << " has been successfully connected" << std::endl;
+        //std::cout << "Dynamixel " << dxl_id << " has been successfully connected" << std::endl;
     }
-	dxl_normal.store(1);
+    //dxl_normal.store(state);
     return 1;
 }
 auto read_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandler *packetHandler, int dxl_comm_result, const int dxl_id, const int baudrate, uint16_t &dxl_present_position)->bool
 {
     uint8_t dxl_error = 0;
+    uint16_t state = 1;
     if (portHandler->setBaudRate(baudrate))
     {
+        state = 1;
         //std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
-        std::cout << "Failed to change the baudrate!" << std::endl;
+        //std::cout << "Failed to change the baudrate!" << std::endl;
         getch();
-		dxl_normal.store(0);
+        state = 0;
         return 0;
     }
     dxl_comm_result = packetHandler->read2ByteTxRx(portHandler, dxl_id, ADDR_MX_PRESENT_POSITION, &dxl_present_position, &dxl_error);
     if (dxl_comm_result != COMM_SUCCESS)
     {
-        printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
-		dxl_normal.store(0);
+        //printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
+        state = 0;
         return 0;
     }
     else if (dxl_error != 0)
     {
-        printf("%s\n", packetHandler->getRxPacketError(dxl_error));
-		dxl_normal.store(0);
+        //printf("%s\n", packetHandler->getRxPacketError(dxl_error));
+        state = 0;
         return 0;
     }
-	dxl_normal.store(1);
+    //dxl_normal.store(state);
     return 1;
 
 }
 auto write_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandler *packetHandler, int dxl_comm_result, const int dxl_id, const int baudrate, int target_pos)->bool
 {
     uint8_t dxl_error = 0;
+    uint16_t state = 1;
     if (portHandler->setBaudRate(baudrate))
     {
+        state = 1;
         //std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
-        std::cout << "Failed to change the baudrate!" << std::endl;
+        //std::cout << "Failed to change the baudrate!" << std::endl;
         getch();
-		dxl_normal.store(0);
+        state = 0;
         return 0;
     }
     dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, dxl_id, ADDR_MX_GOAL_POSITION, target_pos, &dxl_error);
     if (dxl_comm_result != COMM_SUCCESS)
     {
-        printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
-		dxl_normal.store(0);
+        //printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
+        state = 0;
         return 0;
     }
     else if (dxl_error != 0)
     {
-        printf("%s\n", packetHandler->getRxPacketError(dxl_error));
-		dxl_normal.store(0);
+        //printf("%s\n", packetHandler->getRxPacketError(dxl_error));
+        state = 0;
         return 0;
     }
-	dxl_normal.store(1);
+    //dxl_normal.store(state);
     return 1;
 
 }
 auto disable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandler *packetHandler, int dxl_comm_result, const int dxl_id, const int baudrate)->bool
 {
     uint8_t dxl_error = 0;
+    uint16_t state = 1;
     // Set port baudrate for Dynamixel
     if (portHandler->setBaudRate(baudrate))
     {
-        std::cout << "Succeeded to change the baudrate!" << std::endl;
+        state = 1;
+        //std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
-        std::cout << "Failed to change the baudrate!" << std::endl;
+        //std::cout << "Failed to change the baudrate!" << std::endl;
         getch();
-		dxl_normal.store(0);
+        state = 0;
         return 0;
     }
     // Disable Dynamixel Torque
     dxl_comm_result = packetHandler->write1ByteTxRx(portHandler, dxl_id, ADDR_MX_TORQUE_ENABLE, TORQUE_DISABLE, &dxl_error);
     if (dxl_comm_result != COMM_SUCCESS)
     {
-        std::cout << packetHandler->getTxRxResult(dxl_comm_result) << std::endl;
-		dxl_normal.store(0);
+        //std::cout << packetHandler->getTxRxResult(dxl_comm_result) << std::endl;
+        state = 0;
         return 0;
     }
     else if (dxl_error != 0)
     {
-        std::cout << packetHandler->getRxPacketError(dxl_error) << std::endl;
-		dxl_normal.store(0);
+        //std::cout << packetHandler->getRxPacketError(dxl_error) << std::endl;
+        state = 0;
         return 0;
     }
     else
     {
-        std::cout << "Dynamixel " << dxl_id << " has been successfully connected" << std::endl;
+        //std::cout << "Dynamixel " << dxl_id << " has been successfully connected" << std::endl;
     }
-	dxl_normal.store(1);
+    //dxl_normal.store(state);
     return 1;
 }
 
@@ -287,9 +295,15 @@ const std::string modelxmlfile = "model_rokae.xml";
 
 int main(int argc, char *argv[])
 {
+    //cpu_set_t mask;
+    //CPU_ZERO(&mask);
+    //CPU_SET(1, &mask);
+    //CPU_SET(2, &mask);
+
     //Start t_Dynamixel thread//
     t_dynamixel = std::thread([&]()->bool
     {
+        //pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask);
         // Initialize PortHandler instance
         // Set the port path
         // Get methods and members of PortHandlerLinux or PortHandlerWindows
@@ -328,7 +342,6 @@ int main(int argc, char *argv[])
             getch();
             return 0;
         }
-
         while (1)
         {
             auto en = is_enabled.load();
@@ -348,7 +361,7 @@ int main(int argc, char *argv[])
                     dxl_present_position1 = std::int16_t(dxl_present_position1);
                     dxl_present_position2 = std::int16_t(dxl_present_position2);
                     dxl_present_position3 = std::int16_t(dxl_present_position3);
-					std::cout << "pos1:" << dxl_present_position1 << std::endl;
+                    std::cout << "pos1:" << dxl_present_position1 << std::endl;
 					std::cout << "pos2:" << dxl_present_position2 << std::endl;
                     std::cout << "pos3:" << dxl_present_position3 << std::endl;
                     target_pos1.store(dxl_present_position1);
@@ -390,14 +403,11 @@ int main(int argc, char *argv[])
 						dxl_auto.store(true);
                         if (enable_dynamixel_auto.exchange(false))
                         {
-                            std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
-							bool dxl1_active = !dxl_pos[0].empty(), dxl2_active = !dxl_pos[1].empty(), dxl3_active = !dxl_pos[2].empty();
-							auto data_length = std::max(std::max(dxl_pos[0].size(), dxl_pos[1].size()), dxl_pos[2].size());
                             static int dxl_couter;
                             dxl_couter = 0;
+                            //auto start = std::chrono::system_clock::now();
                             while(1)
                             {
-                                if(dxl_couter>=data_length-1) break;
                                 if(syn_clock.load() ==0)
                                 {
                                      std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -405,12 +415,18 @@ int main(int argc, char *argv[])
                                 }
                                 if(syn_clock.load()>0)
                                   {
+                                      std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
+                                      bool dxl1_active = !dxl_pos[0].empty(), dxl2_active = !dxl_pos[1].empty(), dxl3_active = !dxl_pos[2].empty();
+                                      auto data_length = std::max(std::max(dxl_pos[0].size(), dxl_pos[1].size()), dxl_pos[2].size());
+                                      if(dxl_couter>=data_length-1) break;
+
                                       if (dxl1_active)
                                       {
                                           write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_pos[0][dxl_couter]);
-                                          read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+                                          //read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
                                           auto dxl1 = std::int16_t(dxl_present_position1);
                                           current_pos1.store(1.0*dxl1 / SCALING);
+
                                       }
                                       if (dxl2_active)
                                       {
@@ -428,6 +444,10 @@ int main(int argc, char *argv[])
                                       }
                                     syn_clock--;//10ms计时标记位
                                     dxl_couter++;//emily舵机位置指向变量
+                                    //auto end = std::chrono::system_clock::now();
+                                    //auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+                                    //std::cout <<  "花费了" << double(duration.count()) * std::chrono::milliseconds::period::num / std::chrono::milliseconds::period::den   << "ms" << std::endl;
+
                                   }
                             }
                         }
@@ -469,7 +489,7 @@ int main(int argc, char *argv[])
 
 
 	//生成kaanh.xml文档	
-
+/*
 	//-------for qifan robot begin//
 	cs.resetController(kaanh::createControllerQifan().release());
 	cs.resetModel(kaanh::createModelQifan().release());
@@ -483,9 +503,9 @@ int main(int argc, char *argv[])
     cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for qifan robot end// 
+*/
 
 
-    /*
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
 	cs.resetModel(kaanh::createModelRokae().release());
@@ -497,7 +517,7 @@ int main(int argc, char *argv[])
 	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for rokae robot end// 
-    */
+
 
     cs.loadXmlFile(xmlpath.string().c_str());
 

@@ -466,7 +466,7 @@ namespace kaanh
 		par.motion_state.resize(7, 0);
 		std::any param = par;
 		//std::any param = std::make_any<GetParam>();
-        int motion_num = 7;
+        int motion_num = 6;
 		target.server->getRtData([&](aris::server::ControlServer& cs, const aris::plan::PlanTarget *target, std::any& data)->void
 		{
 			for (aris::Size i(-1); ++i < cs.model().partPool().size();)
@@ -558,7 +558,7 @@ namespace kaanh
         //out_data.motion_pos[8] = target_pos2.load()*10;
         //out_data.motion_pos[9] = target_pos3.load()*10;
 
-		std::vector<int> slave_online(7, 0), slave_al_state(7, 0);
+        std::vector<int> slave_online(motion_num, 0), slave_al_state(motion_num, 0);
         for (aris::Size i = 0; i < motion_num; i++)
 		{
 			slave_online[i] = int(out_data.sls[i].online);
@@ -917,10 +917,10 @@ namespace kaanh
 		std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
         if (planptr && planptr->plan.get()->name() == this->name())
 		{
-			target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION | aris::plan::Plan::Option::NOT_RUN_COLLECT_FUNCTION;
+            target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
 			return;
 		}
-
+        std::cout << "start" <<std::endl;
 		auto c = target.controller;
 		MoveEParam param;
 		param.active.clear();
@@ -930,7 +930,7 @@ namespace kaanh
 		param.pos.resize(7);
 		param.target_pos.resize(7);
 		std::ifstream infile;
-
+std::cout << "1" <<std::endl;
 		for (auto cmd_param : params)
 		{
 			if (cmd_param.first == "col")
@@ -939,15 +939,19 @@ namespace kaanh
 			}
 			else if (cmd_param.first == "path")
 			{
+std::cout << "2" <<std::endl;
 				std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
+std::cout << "3" <<std::endl;
 				dxl_pos.clear();
 				dxl_pos.resize(3);
 				auto path = cmd_param.second;
 				infile.open(path);
+std::cout << "4" <<std::endl;
 				//检查读取文件是否成功//
 				if (!infile)throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " fail to open the file");
 				//解析log文件//
 				std::string data;
+
 				while (std::getline(infile, data))
 				{
 					if (data.find("[HEADER]") != std::string::npos)
@@ -1033,6 +1037,7 @@ namespace kaanh
 						}
 						dxl_count++;
 					}
+                    std::cout << "duoji:"<< dxl_pos[0].size()<<std::endl;
 				}
 
 				//导轨数值除以1000，单位由mm换算成m
@@ -1088,13 +1093,13 @@ namespace kaanh
             }
 		}
 
-		//对机械臂及外部轴数据进行滑动滤波，窗口为11,
+        //对机械臂及外部轴数据进行滑动滤波，窗口为11
 		uint16_t window = 11;
 		for (int i = 0; i < param.target_pos.size(); i++)
 		{
 			for (int j = 0; j < param.target_pos[0].size(); j++)
 			{
-				if (j < 10)
+                if (j < window)
 				{
 					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin(), param.target_pos[i].begin() + j + 1, 0.0) / (j + 1);
 				}
@@ -1104,6 +1109,22 @@ namespace kaanh
 				}	
 			}
 		}
+        //对机械臂及外部轴数据进行滑动滤波，窗口为4
+        uint16_t window2 = 4;
+        for (int i = 0; i < param.target_pos.size(); i++)
+        {
+            for (int j = 0; j < param.target_pos[0].size(); j++)
+            {
+                if (j < window2)
+                {
+                    param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin(), param.target_pos[i].begin() + j + 1, 0.0) / (j + 1);
+                }
+                else
+                {
+                    param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin() + j - 3, param.target_pos[i].begin() + j + 1, 0.0) / window2;
+                }
+            }
+        }
 
         for (int j = 0; j < param.target_pos.size(); j++)
 		{
@@ -1114,18 +1135,19 @@ namespace kaanh
 			std::cout << std::endl;
 		}
 
-        target.param = param;
-		std::vector<std::pair<std::string, std::any>> ret;
-		target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER|Plan::NOT_CHECK_POS_CONTINUOUS);
 		// 使能舵机emily功能 //
 		enable_dynamixel_auto.store(true);
+        target.param = param;
+        std::vector<std::pair<std::string, std::any>> ret;
+        target.ret = ret;
 	}
 	auto MoveE::executeRT(PlanTarget &target)->int
 	{
 		auto &param = std::any_cast<MoveEParam&>(target.param);
 		auto controller = target.controller;
 		static aris::Size total_count = 1;
+        syn_clock.store(1);
         if (target.count % 10 == 0)
         {
             syn_clock++;
@@ -1166,8 +1188,6 @@ namespace kaanh
 #endif // WIN32
 
 #ifdef UNIX
-        std::cout << "3"<<std::endl;
-        std::cout << controller->motionPool().size()<<std::endl;
 		//线性插值轨迹//
 		for (int i = 0; i < controller->motionPool().size(); i++)
 		{
@@ -1178,7 +1198,8 @@ namespace kaanh
 			total_count = std::max(param.target_pos[i].size(), total_count);
 		}
         //if (target.model->solverPool().at(1).kinPos())return -1;
-		// 打印 //
+        // 打印 //
+        /*
 		auto &cout = controller->mout();
 		if (target.count % 100 == 0)
 		{
@@ -1188,7 +1209,9 @@ namespace kaanh
 			}
 			cout << std::endl;
 		}
+        */
 		// log //
+        /*
 		auto &lout = controller->lout();
 		for (Size i = 0; i < controller->motionPool().size(); ++i)
 		{
@@ -1198,6 +1221,7 @@ namespace kaanh
 			}
 			lout << std::endl;
 		}
+        */
 #endif // UNIX
 
 		return total_count - target.count - 1;
@@ -5704,10 +5728,10 @@ namespace kaanh
         plan_root->planPool().add<aris::plan::Recover>();
         auto &rs = plan_root->planPool().add<aris::plan::Reset>();
         //for qifan robot//
-        rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
+        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
 
         //for rokae robot//
-        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
+        rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
 
         plan_root->planPool().add<aris::plan::MoveAbsJ>();
         plan_root->planPool().add<aris::plan::MoveL>();
