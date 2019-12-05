@@ -69,8 +69,10 @@ const int BAUDRATE3 = 1000000;
 std::thread t_dynamixel;
 std::mutex dynamixel_mutex;
 
+
 std::atomic_int syn_clock = 0;
 std::atomic_int mode_dynamixel = 2;		//mode_dynamixel——0:manual, 1:auto, 2:NA
+std::atomic_bool find_zero = false;		//找零
 std::atomic_bool enable_dynamixel_auto = false;		//enable_dynamixel_auto——0:disable dynamixel auto, 1:enable dynamixel auto
 std::atomic_bool enable_dynamixel_manual = false;		//enable_dynamixel_manual——0:disable dynamixel manual, 1:enable dynamixel manual
 std::atomic_int is_enabled = 2;		//is_enabled——0:disable, 1:enable, 2:NA
@@ -424,8 +426,8 @@ int main(int argc, char *argv[])
                                           auto dxl3 = std::int16_t(dxl_present_position3);
                                           current_pos3.store(1.0*dxl3 / SCALING);
                                       }
-                                    syn_clock--;
-                                    dxl_couter++;
+                                    syn_clock--;//10ms计时标记位
+                                    dxl_couter++;//emily舵机位置指向变量
                                   }
                             }
                         }

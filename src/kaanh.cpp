@@ -1035,7 +1035,7 @@ namespace kaanh
 					}
 				}
 
-				//导轨数值除以1000，单位有mm换算成m
+				//导轨数值除以1000，单位由mm换算成m
                 for(int m=0; m<param.pos[6].size(); m++)
                 {
                     param.pos[6][m] = (param.pos[6][m])/1000.0;
@@ -1086,6 +1086,23 @@ namespace kaanh
 				}
 				infile.close();
             }
+		}
+
+		//对机械臂及外部轴数据进行滑动滤波，窗口为11,
+		uint16_t window = 11;
+		for (int i = 0; i < param.target_pos.size(); i++)
+		{
+			for (int j = 0; j < param.target_pos[0].size(); j++)
+			{
+				if (j < 10)
+				{
+					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin(), param.target_pos[i].begin() + j + 1, 0.0) / (j + 1);
+				}
+				else
+				{
+					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin() + j - 10, param.target_pos[i].begin() + j + 1, 0.0) / window;
+				}	
+			}
 		}
 
         for (int j = 0; j < param.target_pos.size(); j++)
