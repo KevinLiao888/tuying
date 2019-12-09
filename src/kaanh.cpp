@@ -3,6 +3,7 @@
 #include <array>
 #include <stdlib.h>
 #include <numeric>
+#include "json.hpp"
 #ifdef UNIX
 #include <sys/time.h>
 #endif // UNIX
@@ -915,12 +916,12 @@ namespace kaanh
 		//当前有指令在执行//
 		auto&cs = aris::server::ControlServer::instance();
 		std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
-        if (planptr && planptr->plan.get()->name() == this->name())
+		if (planptr && planptr->plan.get()->name() == this->name())
 		{
-            target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
+			target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
 			return;
 		}
-        std::cout << "start" <<std::endl;
+		std::cout << "start" << std::endl;
 		auto c = target.controller;
 		MoveEParam param;
 		param.active.clear();
@@ -930,7 +931,7 @@ namespace kaanh
 		param.pos.resize(7);
 		param.target_pos.resize(7);
 		std::ifstream infile;
-std::cout << "1" <<std::endl;
+
 		for (auto cmd_param : params)
 		{
 			if (cmd_param.first == "col")
@@ -939,14 +940,12 @@ std::cout << "1" <<std::endl;
 			}
 			else if (cmd_param.first == "path")
 			{
-std::cout << "2" <<std::endl;
 				std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
-std::cout << "3" <<std::endl;
 				dxl_pos.clear();
 				dxl_pos.resize(3);
 				auto path = cmd_param.second;
 				infile.open(path);
-std::cout << "4" <<std::endl;
+
 				//检查读取文件是否成功//
 				if (!infile)throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " fail to open the file");
 				//解析log文件//
@@ -971,17 +970,17 @@ std::cout << "4" <<std::endl;
 					}
 					if (data.find("ACTIVE_AXIS") != std::string::npos)
 					{
-                        std::string split = "=";
+						std::string split = "=";
 						// 以‘= ’为分隔符拆分字符串
 						auto axis_pos = data.find(split);
 						auto axis_string = data.substr(axis_pos + 1);
-                        std::cout << "axis_string:" << axis_string << std::endl;
+						std::cout << "axis_string:" << axis_string << std::endl;
 						std::string axis_split = ",";
 						splitString(axis_split, axis_string, param.active);
-                        for(int i=0; i< param.active.size(); i++)
-                        {
-                            std::cout << "active size:" << param.active[i] << std::endl;
-                        }
+						for (int i = 0; i < param.active.size(); i++)
+						{
+							std::cout << "active size:" << param.active[i] << std::endl;
+						}
 						std::cout << "active size:" << param.active.size() << std::endl;
 						continue;
 					}
@@ -1037,128 +1036,128 @@ std::cout << "4" <<std::endl;
 						}
 						dxl_count++;
 					}
-                    std::cout << "duoji:"<< dxl_pos[0].size()<<std::endl;
+					std::cout << "duoji:" << dxl_pos[0].size() << std::endl;
 				}
 
-				//导轨数值除以1000，单位由mm换算成m
-                for(int m=0; m<param.pos[6].size(); m++)
-                {
-                    param.pos[6][m] = (param.pos[6][m])/1000.0;
-                }
+				//数据处理---导轨数值除以1000，单位由mm换算成m
+				for (int m = 0; m < param.pos[6].size(); m++)
+				{
+					param.pos[6][m] = (param.pos[6][m]) / 1000.0;
+				}			
+				//数据处理---舵机数据单位是0.1度，除以10并乘以11.378，换算成脉冲数
+				for (int j = 0; j < dxl_pos.size(); j++)
+				{
+					if (!dxl_pos[j].empty())
+					{
+						for (int m = 0; m < dxl_pos[j].size(); m++)
+						{
+							dxl_pos[j][m] = dxl_pos[j][m] / 10.0*11.378;
+						}
+					}
+					else
+					{
+						continue;
+					}
+				}
 
-                for(int j=0; j<dxl_pos.size();j++)
-                {
-                    if(!dxl_pos[j].empty())
-                    {
-                        for(int m=0; m<dxl_pos[j].size(); m++)
-                        {
-                            dxl_pos[j][m] = dxl_pos[j][m]/10.0*11.378;
-                        }
-                    }
-                    else
-                    {
-                        continue;
-                    }
-                }
-
-				//对机械臂以及外部轴数据进行插值//
+				//数据处理--对机械臂以及外部轴数据进行插值//
 				for (int i = 0; i < param.pos.size(); i++)
 				{
 					if (!param.pos[i].empty())
 					{
-                        if(i<6)
-                        {
-                            for (int j = 0; j < param.pos[i].size() - 1; j++)
-                            {
-                                for (double count = param.temp_pos[0][j]; count < param.temp_pos[0][j + 1]; count = count + 0.001*param.ratio)
-                                {
-                                    param.target_pos[i].push_back(interpolate(param.temp_pos[0][j], param.temp_pos[0][j + 1], param.pos[i][j], param.pos[i][j + 1], count)* PI / 180.0);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            for (int j = 0; j < param.pos[i].size() - 1; j++)
-                            {
-                                for (double count = param.temp_pos[0][j]; count < param.temp_pos[0][j + 1]; count = count + 0.001*param.ratio)
-                                {
-                                    param.target_pos[i].push_back(interpolate(param.temp_pos[0][j], param.temp_pos[0][j + 1], param.pos[i][j], param.pos[i][j + 1], count));
-                                }
-                            }
-                        }
+						if (i < 6)
+						{
+							for (int j = 0; j < param.pos[i].size() - 1; j++)
+							{
+								for (double count = param.temp_pos[0][j]; count < param.temp_pos[0][j + 1] - 0.2*0.001*param.ratio; count = count + 0.001*param.ratio)
+								{
+									param.target_pos[i].push_back(interpolate(param.temp_pos[0][j], param.temp_pos[0][j + 1], param.pos[i][j], param.pos[i][j + 1], count)* PI / 180.0);
+								}
+							}
+						}
+						else
+						{
+							for (int j = 0; j < param.pos[i].size() - 1; j++)
+							{
+								for (double count = param.temp_pos[0][j]; count < param.temp_pos[0][j + 1] - 0.2*0.001*param.ratio; count = count + 0.001*param.ratio)
+								{
+									param.target_pos[i].push_back(interpolate(param.temp_pos[0][j], param.temp_pos[0][j + 1], param.pos[i][j], param.pos[i][j + 1], count));
+								}
+							}
+						}
 
 					}
 				}
 				infile.close();
-            }
+			}
 		}
 
-        //对机械臂及外部轴数据进行滑动滤波，窗口为11
+		//对机械臂及外部轴数据进行滑动滤波，窗口为11
 		uint16_t window = 11;
 		for (int i = 0; i < param.target_pos.size(); i++)
 		{
 			for (int j = 0; j < param.target_pos[0].size(); j++)
 			{
-                if (j < window)
+				if (j < window)
 				{
 					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin(), param.target_pos[i].begin() + j + 1, 0.0) / (j + 1);
 				}
 				else
 				{
 					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin() + j - 10, param.target_pos[i].begin() + j + 1, 0.0) / window;
-				}	
+				}
 			}
 		}
-        //对机械臂及外部轴数据进行滑动滤波，窗口为4
-        uint16_t window2 = 4;
-        for (int i = 0; i < param.target_pos.size(); i++)
-        {
-            for (int j = 0; j < param.target_pos[0].size(); j++)
-            {
-                if (j < window2)
-                {
-                    param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin(), param.target_pos[i].begin() + j + 1, 0.0) / (j + 1);
-                }
-                else
-                {
-                    param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin() + j - 3, param.target_pos[i].begin() + j + 1, 0.0) / window2;
-                }
-            }
-        }
-
-        for (int j = 0; j < param.target_pos.size(); j++)
+		//对机械臂及外部轴数据进行滑动滤波，窗口为4
+		uint16_t window2 = 4;
+		for (int i = 0; i < param.target_pos.size(); i++)
 		{
-            for (int i = 0; i < 13; i++)
+			for (int j = 0; j < param.target_pos[0].size(); j++)
+			{
+				if (j < window2)
+				{
+					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin(), param.target_pos[i].begin() + j + 1, 0.0) / (j + 1);
+				}
+				else
+				{
+					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin() + j - 3, param.target_pos[i].begin() + j + 1, 0.0) / window2;
+				}
+			}
+		}
+
+		for (int j = 0; j < param.target_pos.size(); j++)
+		{
+			for (int i = 0; i < 13; i++)
 			{
 				std::cout << param.target_pos[j][i] << "  ";
 			}
 			std::cout << std::endl;
 		}
 
-        std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER|Plan::NOT_CHECK_POS_CONTINUOUS);
+		std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER | Plan::NOT_CHECK_POS_CONTINUOUS);
 		// 使能舵机emily功能 //
 		enable_dynamixel_auto.store(true);
-        target.param = param;
-        std::vector<std::pair<std::string, std::any>> ret;
-        target.ret = ret;
+		target.param = param;
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
 	}
 	auto MoveE::executeRT(PlanTarget &target)->int
 	{
 		auto &param = std::any_cast<MoveEParam&>(target.param);
 		auto controller = target.controller;
 		static aris::Size total_count = 1;
-        syn_clock.store(1);
-        if (target.count % 10 == 0)
-        {
-            syn_clock++;
-        }
+		syn_clock.store(1);
+		if (target.count % 10 == 0)
+		{
+			syn_clock++;
+		}
 
 #ifdef WIN32
 		for (int i = 0; i < target.model->motionPool().size(); i++)
 		{
 			if (!param.target_pos[i].empty())
 			{
-                target.model->motionPool().at(i).setMp(param.target_pos[i][target.count]);
+				target.model->motionPool().at(i).setMp(param.target_pos[i][target.count-1]);
 			}
 			total_count = std::max(param.target_pos[i].size(), total_count);
 		}
@@ -1193,13 +1192,13 @@ std::cout << "4" <<std::endl;
 		{
 			if (!param.target_pos[i].empty())
 			{
-                controller->motionPool()[i].setTargetPos(param.target_pos[i][target.count]);
+				controller->motionPool()[i].setTargetPos(param.target_pos[i][target.count-1]);
 			}
 			total_count = std::max(param.target_pos[i].size(), total_count);
 		}
-        //if (target.model->solverPool().at(1).kinPos())return -1;
-        // 打印 //
-        /*
+		//if (target.model->solverPool().at(1).kinPos())return -1;
+		// 打印 //
+		/*
 		auto &cout = controller->mout();
 		if (target.count % 100 == 0)
 		{
@@ -1209,9 +1208,9 @@ std::cout << "4" <<std::endl;
 			}
 			cout << std::endl;
 		}
-        */
+		*/
 		// log //
-        /*
+		/*
 		auto &lout = controller->lout();
 		for (Size i = 0; i < controller->motionPool().size(); ++i)
 		{
@@ -1221,7 +1220,7 @@ std::cout << "4" <<std::endl;
 			}
 			lout << std::endl;
 		}
-        */
+		*/
 #endif // UNIX
 
 		return total_count - target.count - 1;
@@ -1231,6 +1230,278 @@ std::cout << "4" <<std::endl;
 	{
 		command().loadXmlStr(
 			"<Command name=\"mve\">"
+			"	<GroupParam>"
+			"		<Param name=\"col\" default=\"9\"/>"
+			"		<Param name=\"path\" default=\"/home/kaanh/Desktop/emily/output.emily\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 执行emily文件 //
+	struct MoveE0Param
+	{
+		std::vector<std::vector<double>> pos;
+		std::vector<std::vector<double>> target_pos;
+		std::vector<std::vector<double>> temp_pos;
+		std::vector<bool> active;
+		std::vector<double> axis_begin_pos_vec;
+		std::vector<double> axis_vel_vec;
+		std::vector<double> axis_acc_vec;
+		std::vector<double> axis_dec_vec;
+		std::int16_t col;
+		double ratio;
+	};
+	auto MoveE0::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		//当前有指令在执行//
+		auto&cs = aris::server::ControlServer::instance();
+		std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
+        if (planptr && planptr->plan.get()->name() == this->name())
+		{
+            target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
+			return;
+		}
+		auto c = target.controller;
+		double percent = 0.1; //速度、加速度系数
+		int16_t motor_num = 7; //电机数量
+		MoveE0Param param;
+		param.active.clear();
+		param.pos.clear();
+		param.target_pos.clear();
+		param.temp_pos.clear();
+		param.pos.resize(motor_num);
+		param.target_pos.resize(motor_num);
+		std::ifstream infile;
+		param.axis_begin_pos_vec.resize(motor_num, 0.0);
+		param.axis_vel_vec.resize(motor_num, 0.0);
+		param.axis_acc_vec.resize(motor_num, 0.0);
+		param.axis_dec_vec.resize(motor_num, 0.0);
+		//设置最大速度、加速度、减速度
+		for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+		{
+			param.axis_vel_vec[i] = percent * c->motionPool()[i].maxVel();
+			param.axis_acc_vec[i] = percent * c->motionPool()[i].maxAcc();
+			param.axis_dec_vec[i] = percent * c->motionPool()[i].minAcc();
+		}
+
+		for (auto cmd_param : params)
+		{
+			if (cmd_param.first == "col")
+			{
+				param.col = std::stoi(cmd_param.second);
+			}
+			else if (cmd_param.first == "path")
+			{
+				std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
+				dxl_pos.clear();
+				dxl_pos.resize(3);
+				auto path = cmd_param.second;
+				infile.open(path);
+
+				//检查读取文件是否成功//
+				if (!infile)throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " fail to open the file");
+				//解析log文件//
+				std::string data;
+
+				while (std::getline(infile, data))
+				{
+					if (data.find("[HEADER]") != std::string::npos)
+					{
+						continue;
+					}
+					if (data.find("GEAR_NOMINAL_VEL") != std::string::npos)
+					{
+						std::string split = "=";
+						// 以‘=’为分隔符拆分字符串
+						auto vel_pos = data.find(split);
+						auto sp_vel = data.substr(vel_pos + 1);
+						std::string vel = sp_vel;
+						param.ratio = std::stod(vel) / 1.0;
+						std::cout << "ratio:" << param.ratio << std::endl;
+						continue;
+					}
+					if (data.find("ACTIVE_AXIS") != std::string::npos)
+					{
+                        std::string split = "=";
+						// 以‘= ’为分隔符拆分字符串
+						auto axis_pos = data.find(split);
+						auto axis_string = data.substr(axis_pos + 1);
+						std::string axis_split = ",";
+						splitString(axis_split, axis_string, param.active);
+						continue;
+					}
+					if (data.find("[RECORDS]") != std::string::npos)
+					{
+						continue;
+					}
+					if (data.find("[END]") != std::string::npos)
+					{
+						break;
+					}
+					param.temp_pos.resize(std::accumulate(param.active.begin(), param.active.end(), 0) + 1);
+					char *s_input = (char *)data.c_str();
+					const char *split = "  ";
+					// 以‘ ’为分隔符拆分字符串//
+					char *sp_input = strtok(s_input, split);
+
+					double data_input;
+					int i = 0;
+					while (sp_input != NULL)
+					{
+						data_input = atof(sp_input);
+						param.temp_pos[i++].push_back(data_input);
+						sp_input = strtok(NULL, split);
+						continue;
+					}
+					if (s_input != NULL)
+					{
+						s_input = NULL;
+					}
+					delete(sp_input);
+					sp_input = NULL;
+					break;
+				}
+				infile.close();
+
+				//数据提取//
+				int pos_count = 1, dxl_count = 0;
+				for (int k = 0; k < param.active.size(); k++)
+				{
+					if (k <= 6)
+					{
+						if (param.active[k])
+						{
+							param.pos[k].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
+							pos_count++;
+						}
+					}
+					if (k > 6)
+					{
+						if (param.active[k])
+						{
+							dxl_pos[dxl_count].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
+							pos_count++;
+						}
+						dxl_count++;
+					}
+				}
+
+				//如果没有提取到数据，不执行程序，并返回
+				int16_t judge_flag = 0;
+				for (int k = 0; k < param.active.size(); k++)
+				{
+					judge_flag = judge_flag + param.pos[k].size();
+				}
+				if (judge_flag == 0)
+				{
+					target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
+					throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " fail to get emily data");
+					return;
+				}
+
+				//导轨数值除以1000，单位由mm换算成m
+                if(!param.pos[6].empty())
+                {
+                    param.pos[6][0] = (param.pos[6][0])/1000.0;
+                }
+				
+				//舵机数据单位是0.1度，除以10并乘以11.378，换算成脉冲数
+                for(int j=0; j<dxl_pos.size();j++)
+                {
+                    if(!dxl_pos[j].empty())
+                    {
+                        for(int m=0; m<dxl_pos[j].size(); m++)
+                        {
+                            dxl_pos[j][m] = dxl_pos[j][m]/10.0*11.378;
+                        }
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+
+				//提取机械臂以及外部轴数据第一行数据//
+				for (int i = 0; i < param.pos.size(); i++)
+				{
+					if (!param.pos[i].empty())
+					{
+                        if(i<6)
+                        {
+                            param.target_pos[i].push_back(param.pos[i][0]* PI / 180.0);
+                        }
+                        else
+                        {
+                            param.target_pos[i].push_back(param.pos[i][0]);
+                        }
+					}
+				}	
+            }
+		}
+
+        std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER|Plan::NOT_CHECK_POS_CONTINUOUS);
+		// 使能舵机emily功能 //
+		enable_dynamixel_auto.store(true);
+        target.param = param;
+        std::vector<std::pair<std::string, std::any>> ret;
+        target.ret = ret;
+	}
+	auto MoveE0::executeRT(PlanTarget &target)->int
+	{
+		auto &param = std::any_cast<MoveE0Param&>(target.param);
+		auto controller = target.controller;
+		static aris::Size total_count = 1;
+        syn_clock.store(1);
+
+		// 取得起始位置 //
+		if (target.count == 1)
+		{
+			for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+			{
+				param.axis_begin_pos_vec[i] = controller->motionPool().at(i).actualPos();
+			}
+		}
+
+#ifdef WIN32
+		for (int i = 0; i < target.model->motionPool().size(); i++)
+		{
+			double p, v, a;
+			aris::Size count = 0;
+			if (!param.target_pos[i].empty())
+			{
+				aris::plan::moveAbsolute(target.count, param.axis_begin_pos_vec[i], param.target_pos[i][0], param.axis_vel_vec[i] / 1000
+					, param.axis_acc_vec[i] / 1000 / 1000, param.axis_dec_vec[i] / 1000 / 1000, p, v, a, count);
+				target.model->motionPool().at(i).setMp(p);
+				total_count = std::max(count, total_count);
+			}
+		}
+		if (target.model->solverPool().at(1).kinPos())return -1;
+
+#endif // WIN32
+
+#ifdef UNIX
+		//线性插值轨迹//
+		for (int i = 0; i < controller->motionPool().size(); i++)
+		{
+			if (!param.target_pos[i].empty())
+			{
+				aris::plan::moveAbsolute(target.count, param.axis_begin_pos_vec[i], param.target_pos[i][0], param.axis_vel_vec[i] / 1000
+					, param.axis_acc_vec[i] / 1000 / 1000, param.axis_dec_vec[i] / 1000 / 1000, p, v, a, count);
+				controller->motionPool().at(i).setTargetPos(p);
+				total_count = std::max(count, total_count);
+			}
+		}
+        if (target.model->solverPool().at(1).kinPos())return -1;
+#endif // UNIX
+
+		return total_count - target.count;
+	}
+	auto MoveE0::collectNrt(PlanTarget &target)->void {}
+	MoveE0::MoveE0(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"mve0\">"
 			"	<GroupParam>"
 			"		<Param name=\"col\" default=\"9\"/>"
             "		<Param name=\"path\" default=\"/home/kaanh/Desktop/emily/output.emily\"/>"
@@ -5597,6 +5868,88 @@ std::cout << "4" <<std::endl;
 	}
 
 
+	// 保存示教点 //
+	uint32_t p_num = 1;
+	struct SavePParam
+	{
+		bool newfile;
+	};
+	auto SaveP::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		SavePParam param;
+		std::string point_name;
+		nlohmann::json js;
+		
+		for (auto &p : params)
+		{
+			if (p.first == "nf")
+			{
+				param.newfile = std::stoi(p.second);
+			}
+		}
+
+		if (param.newfile)
+		{
+			//read json file
+			std::cout << "1" << std::endl;
+			std::ifstream file("json/teaching.json");
+			std::cout << "2" << std::endl;
+			file >> js;
+			time_t t = time(0);
+			tm* p = localtime(&t);
+			char filename[30] = { 0 };
+			std::cout << "3" << std::endl;
+			sprintf(filename, "json/%d%02d%02d%02d%02d%02d.json", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
+			std::cout << filename << std::endl;
+			//write json file
+			std::ofstream os;
+			os.open(filename);
+			os << js.dump(2) << std::endl;
+			os.close();
+			
+
+			//new teaching.json
+			js.clear();
+			p_num = 1;
+			point_name = "p" + std::to_string(p_num);
+			auto temp_pos = save_point.load();
+			js[point_name] = temp_pos;
+			//write json file
+			os.open("json/teaching.json");
+			os << js.dump(2) << std::endl;
+			os.close();
+		}
+		else
+		{
+			//read json file
+			std::ifstream file("json/teaching.json");
+			file >> js;
+			//get new pos
+			point_name = "p" + std::to_string(++p_num);
+			auto temp_pos = save_point.load();
+			js[point_name] = temp_pos;
+			//write json file
+			std::ofstream os;
+			os.open("json/teaching.json");
+			os << js.dump(2) << std::endl;
+			os.close();
+		}
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+		target.option = aris::plan::Plan::NOT_RUN_EXECUTE_FUNCTION;
+	}
+	SaveP::SaveP(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"savep\">"
+			"	<GroupParam>"
+			"		<Param name=\"nf\" default=\"0\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
 	//设置全局速度//
 	struct SetVelParam
 	{
@@ -5728,10 +6081,10 @@ std::cout << "4" <<std::endl;
         plan_root->planPool().add<aris::plan::Recover>();
         auto &rs = plan_root->planPool().add<aris::plan::Reset>();
         //for qifan robot//
-        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
+        rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
 
         //for rokae robot//
-        rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
+        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
 
         plan_root->planPool().add<aris::plan::MoveAbsJ>();
         plan_root->planPool().add<aris::plan::MoveL>();
@@ -5781,6 +6134,7 @@ std::cout << "4" <<std::endl;
 		plan_root->planPool().add<kaanh::SetDriver>();
 		plan_root->planPool().add<kaanh::SaveConfig>();
         plan_root->planPool().add<kaanh::SavePoint>();
+		plan_root->planPool().add<kaanh::SaveP>();
 		plan_root->planPool().add<kaanh::SetVel>();
 		plan_root->planPool().add<kaanh::UDVel>();
 		plan_root->planPool().add<kaanh::SetCT>();

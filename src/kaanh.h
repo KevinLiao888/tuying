@@ -73,7 +73,6 @@ namespace kaanh
 		ARIS_REGISTER_TYPE(Get);
 	};
 
-
     class Getp : public aris::plan::Plan
     {
     public:
@@ -84,7 +83,6 @@ namespace kaanh
         ARIS_REGISTER_TYPE(Getp);
     };
 
-
 	class MoveT : public aris::plan::Plan
 	{
 	public:
@@ -94,6 +92,17 @@ namespace kaanh
 
 		explicit MoveT(const std::string &name = "MoveT_plan");
 		ARIS_REGISTER_TYPE(MoveT);
+	};
+
+	class MoveE0 : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual executeRT(aris::plan::PlanTarget &target)->int;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+
+		explicit MoveE0(const std::string &name = "MoveE0_plan");
+		ARIS_REGISTER_TYPE(MoveE0);
 	};
 
 	class MoveE : public aris::plan::Plan
@@ -489,6 +498,14 @@ namespace kaanh
 		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
 		explicit SavePoint(const std::string &name = "SavePoint_plan");
 		ARIS_REGISTER_TYPE(SavePoint);
+	};
+
+	class SaveP : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		explicit SaveP(const std::string &name = "SaveP_plan");
+		ARIS_REGISTER_TYPE(SaveP);
 	};
 
 	class SetVel : public aris::plan::Plan
