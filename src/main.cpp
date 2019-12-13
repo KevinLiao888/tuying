@@ -329,8 +329,8 @@ int main(int argc, char *argv[])
 		  // Initialize GroupSyncWrite instance
 		dynamixel::GroupSyncWrite groupSyncWrite(portHandler, packetHandler, ADDR_MX_GOAL_POSITION, LEN_MX_GOAL_POSITION);
 
-		// Initialize Groupsyncread instance for Present Position
-		dynamixel::GroupSyncRead groupSyncRead(portHandler, packetHandler, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+		// Initialize GroupBulkRead instance
+		dynamixel::GroupBulkRead groupBulkRead(portHandler, packetHandler);
 
         int index = 0;
         int dxl_comm_result1 = COMM_TX_FAIL, dxl_comm_result2 = COMM_TX_FAIL, dxl_comm_result3 = COMM_TX_FAIL;             // Communication result
@@ -480,53 +480,71 @@ int main(int argc, char *argv[])
 									if (dxl1_active)
 									{
 										// Add parameter storage for Dynamixel#1 present position value
-										dxl_addparam_result = groupSyncRead.addParam(DXL_ID1);
+										dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 										if (dxl_addparam_result != true)
 										{
-											fprintf(stderr, "[ID:%03d] groupSyncRead addparam failed", DXL_ID1);
-											break;
+											fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
+											continue;
 										}
 									}                                          
 									if (dxl2_active)
 									{
 										// Add parameter storage for Dynamixel#2 present position value
-										dxl_addparam_result = groupSyncRead.addParam(DXL_ID2);
+										dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 										if (dxl_addparam_result != true)
 										{
-											fprintf(stderr, "[ID:%03d] groupSyncRead addparam failed", DXL_ID2);
-											break;
+											fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
+											continue;
 										}
 									}
 									if (dxl3_active)
 									{
 										// Add parameter storage for Dynamixel#3 present position value
-										dxl_addparam_result = groupSyncRead.addParam(DXL_ID3);
+										dxl_addparam_result = groupBulkRead.addParam(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 										if (dxl_addparam_result != true)
 										{
-											fprintf(stderr, "[ID:%03d] groupSyncRead addparam failed", DXL_ID3);
-											break;
+											fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID3);
+											continue;
 										}
 									}
 
-                                    dxl_comm_result = groupSyncRead.txRxPacket();
+                                    dxl_comm_result = groupBulkRead.txRxPacket();
 									if (dxl1_active)
 									{
+										dxl_getdata_result = groupBulkRead.isAvailable(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+										if (dxl_getdata_result != true)
+										{
+											fprintf(stderr, "[ID:%03d] groupBulkRead getdata failed", DXL_ID1);
+											continue;
+										}
 										// Get Dynamixel#1 present position value
-										dxl_present_position1 = groupSyncRead.getData(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+										dxl_present_position1 = groupBulkRead.getData(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 										auto dxl1 = std::int16_t(dxl_present_position1);
 										current_pos1.store(1.0*dxl1 / SCALING);
 									}                                    
 									if (dxl2_active)
 									{
+										dxl_getdata_result = groupBulkRead.isAvailable(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+										if (dxl_getdata_result != true)
+										{
+											fprintf(stderr, "[ID:%03d] groupBulkRead getdata failed", DXL_ID2);
+											continue;
+										}
 										// Get Dynamixel#2 present position value
-										dxl_present_position2 = groupSyncRead.getData(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+										dxl_present_position2 = groupBulkRead.getData(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 										auto dxl2 = std::int16_t(dxl_present_position2);
 										current_pos2.store(1.0*dxl2 / SCALING);
 									}
 									if (dxl3_active)
 									{
+										dxl_getdata_result = groupBulkRead.isAvailable(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+										if (dxl_getdata_result != true)
+										{
+											fprintf(stderr, "[ID:%03d] groupBulkRead getdata failed", DXL_ID3);
+											continue;
+										}
 										// Get Dynamixel#3 present position value
-										dxl_present_position3 = groupSyncRead.getData(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+										dxl_present_position3 = groupBulkRead.getData(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 										auto dxl3 = std::int16_t(dxl_present_position3);
 										current_pos3.store(1.0*dxl3 / SCALING);
 									}
