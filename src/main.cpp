@@ -367,6 +367,7 @@ int main(int argc, char *argv[])
                     //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
                     //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))return 0;
 
+                    /*
 					// Add parameter storage for Dynamixel#1 present position value
 					dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 					if (dxl_addparam_result != true)
@@ -374,7 +375,7 @@ int main(int argc, char *argv[])
 						fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
 						continue;
 					}
-					/*
+
 					// Add parameter storage for Dynamixel#2 present position value
 					dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 					if (dxl_addparam_result != true)
@@ -392,7 +393,7 @@ int main(int argc, char *argv[])
 					}
 					*/
                     
-					//read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+                    read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
                     dxl_present_position1 = std::int16_t(dxl_present_position1);
@@ -503,6 +504,7 @@ int main(int argc, char *argv[])
                                     auto start2 = std::chrono::system_clock::now();
 
 									//syncread function//
+                                    /*
                                     dxl_comm_result = groupBulkRead.txRxPacket();
 									if (dxl1_active)
 									{
@@ -543,6 +545,7 @@ int main(int argc, char *argv[])
 										auto dxl3 = std::int16_t(dxl_present_position3);
 										current_pos3.store(1.0*dxl3 / SCALING);
 									}
+                                    */
 
                                     if(dxl_couter>=data_length-1) break;
 
@@ -561,7 +564,7 @@ int main(int argc, char *argv[])
                     }
 
                     // Read the position of dynamixel1, dynamixel2, dynamixel3 //
-                    //read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+                    read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
                     auto dxl1 = std::int16_t(dxl_present_position1);
