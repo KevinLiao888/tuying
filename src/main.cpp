@@ -361,39 +361,44 @@ int main(int argc, char *argv[])
             try
             {
                 // Enable dynamixel1, dynamixel2, dynamixel3 //
-                if (en == 1)
+                if (en == 1 && !enabled)
                 {
                     if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1))return 0;
                     //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
                     //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))return 0;
 
-                    /*
+
 					// Add parameter storage for Dynamixel#1 present position value
+                    std::cout << "read1" <<std::endl;
 					dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 					if (dxl_addparam_result != true)
 					{
 						fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
-						continue;
+                        continue;
 					}
-
+                    /*
 					// Add parameter storage for Dynamixel#2 present position value
+                    std::cout << "read2" <<std::endl;
 					dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 					if (dxl_addparam_result != true)
 					{
+
 						fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
-						continue;
+                        continue;
 					}
 
 					// Add parameter storage for Dynamixel#3 present position value
+                    std::cout << "read3" <<std::endl;
 					dxl_addparam_result = groupBulkRead.addParam(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 					if (dxl_addparam_result != true)
 					{
+
 						fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID3);
 						continue;
 					}
-					*/
-                    
-                    read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+                    */
+
+                    //read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
                     dxl_present_position1 = std::int16_t(dxl_present_position1);
@@ -504,6 +509,7 @@ int main(int argc, char *argv[])
                                     auto start2 = std::chrono::system_clock::now();
 
 									//simpleread function//
+                                                              /*
 									if (dxl1_active)
 									{
 										read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
@@ -523,9 +529,9 @@ int main(int argc, char *argv[])
 										auto dxl3 = std::int16_t(dxl_present_position3);
 										current_pos3.store(1.0*dxl3 / SCALING);
 									}
-
+*/
 									//bulkread function//
-                                    /*
+
                                     dxl_comm_result = groupBulkRead.txRxPacket();
 									if (dxl1_active)
 									{
@@ -566,7 +572,7 @@ int main(int argc, char *argv[])
 										auto dxl3 = std::int16_t(dxl_present_position3);
 										current_pos3.store(1.0*dxl3 / SCALING);
 									}
-                                    */
+
 
                                     if(dxl_couter>=data_length-1) break;
 
@@ -576,7 +582,7 @@ int main(int argc, char *argv[])
                                     auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(start2 - start1);
                                     auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end - start2);
                                     std::cout <<  "syncwrite:" << "\t" <<double(duration1.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
-                                        << "\t" << "syncread:"<< "\t" << double(duration2.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
+                                        << "\t" << "bulkread:"<< "\t" << double(duration2.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
                                                               << std::endl;
                                 }
                             }

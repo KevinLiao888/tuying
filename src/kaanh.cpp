@@ -3860,7 +3860,16 @@ namespace kaanh
 	// 使能舵机 //
 	auto DEnable::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
+        //当前有指令在执行//
+        auto&cs = aris::server::ControlServer::instance();
+        std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
+        if (planptr && planptr->plan.get()->name() == this->name())
+        {
+            target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
+            return;
+        }
 		is_enabled.store(1);
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
