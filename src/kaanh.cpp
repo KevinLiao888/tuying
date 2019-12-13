@@ -478,7 +478,7 @@ namespace kaanh
 			cs.model().generalMotionPool().at(0).getMpq(std::any_cast<GetParam &>(data).end_pq.data());
 			cs.model().generalMotionPool().at(0).getMpe(std::any_cast<GetParam &>(data).end_pe.data(), "321");
 
-			for (aris::Size i = 0; i < cs.controller().motionPool().size(); i++)
+			for (aris::Size i = 0; i < motion_num; i++)
 			{
 #ifdef WIN32
 				if (i < 6)
@@ -673,7 +673,6 @@ namespace kaanh
             "<Command name=\"getp\">"
             "</Command>");
     }
-
 
 
 	// 执行emily文件 //
@@ -1133,7 +1132,7 @@ namespace kaanh
 			}
 			std::cout << std::endl;
 		}
-
+        std::cout <<"size:" << param.target_pos[0].size() << std::endl;
 		std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER | Plan::NOT_CHECK_POS_CONTINUOUS);
 		// 使能舵机emily功能 //
 		enable_dynamixel_auto.store(true);
@@ -1146,7 +1145,7 @@ namespace kaanh
 		auto &param = std::any_cast<MoveEParam&>(target.param);
 		auto controller = target.controller;
 		static aris::Size total_count = 1;
-		syn_clock.store(1);
+        //syn_clock.store(1);
 		if (target.count % 10 == 0)
 		{
 			syn_clock++;
@@ -1226,13 +1225,14 @@ namespace kaanh
 		return total_count - target.count - 1;
 	}
 	auto MoveE::collectNrt(PlanTarget &target)->void {}
+    //"		<Param name=\"path\" default=\"C:/Users/kevin/Desktop/tuying/emily/output.emily\"/>"
 	MoveE::MoveE(const std::string &name) :Plan(name)
 	{
 		command().loadXmlStr(
 			"<Command name=\"mve\">"
 			"	<GroupParam>"
 			"		<Param name=\"col\" default=\"9\"/>"
-			"		<Param name=\"path\" default=\"/home/kaanh/Desktop/emily/output.emily\"/>"
+            "		<Param name=\"path\" default=\"/home/kaanh/Desktop/emily/output.emily\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -1264,7 +1264,7 @@ namespace kaanh
 		}
 		auto c = target.controller;
 		double percent = 0.1; //速度、加速度系数
-		int16_t motor_num = 7; //电机数量
+        int16_t motor_num = 7; //电机数量
 		MoveE0Param param;
 		param.active.clear();
 		param.pos.clear();
@@ -1457,7 +1457,7 @@ namespace kaanh
 		// 取得起始位置 //
 		if (target.count == 1)
 		{
-			for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+            for (Size i = 0; i < controller->motionPool().size(); ++i)
 			{
 				param.axis_begin_pos_vec[i] = controller->motionPool().at(i).actualPos();
 			}
@@ -1484,6 +1484,8 @@ namespace kaanh
 		//线性插值轨迹//
 		for (int i = 0; i < controller->motionPool().size(); i++)
 		{
+            double p, v, a;
+            aris::Size count = 0;
 			if (!param.target_pos[i].empty())
 			{
 				aris::plan::moveAbsolute(target.count, param.axis_begin_pos_vec[i], param.target_pos[i][0], param.axis_vel_vec[i] / 1000
@@ -5891,22 +5893,21 @@ namespace kaanh
 		if (param.newfile)
 		{
 			//read json file
-			std::cout << "1" << std::endl;
-			std::ifstream file("json/teaching.json");
-			std::cout << "2" << std::endl;
+            std::ifstream file("/home/kaanh/Desktop/emily/json/teaching.json");
 			file >> js;
+            file.close();
 			time_t t = time(0);
 			tm* p = localtime(&t);
-			char filename[30] = { 0 };
-			std::cout << "3" << std::endl;
-			sprintf(filename, "json/%d%02d%02d%02d%02d%02d.json", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
-			std::cout << filename << std::endl;
+            char filename[100] = { 0 };
+            sprintf(filename, "/home/kaanh/Desktop/emily/json/%d%02d%02d%02d%02d%02d.json", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
+            p = NULL;
+            delete (p);
+
 			//write json file
 			std::ofstream os;
 			os.open(filename);
 			os << js.dump(2) << std::endl;
-			os.close();
-			
+            os.close();
 
 			//new teaching.json
 			js.clear();
@@ -5914,15 +5915,17 @@ namespace kaanh
 			point_name = "p" + std::to_string(p_num);
 			auto temp_pos = save_point.load();
 			js[point_name] = temp_pos;
+
 			//write json file
-			os.open("json/teaching.json");
-			os << js.dump(2) << std::endl;
-			os.close();
+            std::ofstream os_write;
+            os_write.open("/home/kaanh/Desktop/emily/json/teaching.json");
+            os_write << js.dump(2) << std::endl;
+            os_write.close();
 		}
 		else
 		{
 			//read json file
-			std::ifstream file("json/teaching.json");
+            std::ifstream file("/home/kaanh/Desktop/emily/json/teaching.json");
 			file >> js;
 			//get new pos
 			point_name = "p" + std::to_string(++p_num);
@@ -5930,16 +5933,19 @@ namespace kaanh
 			js[point_name] = temp_pos;
 			//write json file
 			std::ofstream os;
-			os.open("json/teaching.json");
+            os.open("/home/kaanh/Desktop/emily/json/teaching.json");
 			os << js.dump(2) << std::endl;
 			os.close();
 		}
 
-		std::vector<std::pair<std::string, std::any>> ret;
-		target.ret = ret;
+        js.clear();
+
+        std::vector<std::pair<std::string, std::any>> ret_value;
+        target.ret = ret_value;
 		target.option = aris::plan::Plan::NOT_RUN_EXECUTE_FUNCTION;
 	}
-	SaveP::SaveP(const std::string &name) :Plan(name)
+    auto SaveP::collectNrt(PlanTarget &target)->void{}
+    SaveP::SaveP(const std::string &name) :Plan(name)
 	{
 		command().loadXmlStr(
 			"<Command name=\"savep\">"
@@ -6081,10 +6087,10 @@ namespace kaanh
         plan_root->planPool().add<aris::plan::Recover>();
         auto &rs = plan_root->planPool().add<aris::plan::Reset>();
         //for qifan robot//
-        rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
+        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
 
         //for rokae robot//
-        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
+        rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
 
         plan_root->planPool().add<aris::plan::MoveAbsJ>();
         plan_root->planPool().add<aris::plan::MoveL>();
@@ -6100,6 +6106,7 @@ namespace kaanh
 		plan_root->planPool().add<kaanh::MoveAbJ>();
 		plan_root->planPool().add<kaanh::MoveT>();
 		plan_root->planPool().add<kaanh::MoveE>();
+        plan_root->planPool().add<kaanh::MoveE0>();
 		plan_root->planPool().add<kaanh::MoveJM>();
 		plan_root->planPool().add<kaanh::MoveC>();
 		plan_root->planPool().add<kaanh::JogC>();

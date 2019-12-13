@@ -505,6 +505,7 @@ namespace kaanh
 	public:
 		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
 		explicit SaveP(const std::string &name = "SaveP_plan");
+        auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
 		ARIS_REGISTER_TYPE(SaveP);
 	};
 

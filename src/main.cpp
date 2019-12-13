@@ -34,7 +34,7 @@
 #define DXL_ID2                         2 
 #define DXL_ID3                         3 
 #define BAUDRATE                        57600
-#define BAUDRATE1                       57600
+#define BAUDRATE1                       1000000
 #define BAUDRATE2                       1000000
 #define BAUDRATE3                       1000000
 
@@ -140,7 +140,7 @@ auto enable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHand
     if (portHandler->setBaudRate(baudrate))
     {
         state = 1;
-        //std::cout << "Succeeded to change the baudrate!" << std::endl;
+        std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
@@ -167,7 +167,7 @@ auto enable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHand
     {
         //std::cout << "Dynamixel " << dxl_id << " has been successfully connected" << std::endl;
     }
-    //dxl_normal.store(state);
+    dxl_normal.store(state);
     return 1;
 }
 auto read_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandler *packetHandler, int dxl_comm_result, const int dxl_id, const int baudrate, uint16_t &dxl_present_position)->bool
@@ -199,7 +199,7 @@ auto read_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandle
         state = 0;
         return 0;
     }
-    //dxl_normal.store(state);
+    dxl_normal.store(state);
     return 1;
 
 }
@@ -232,7 +232,7 @@ auto write_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandl
         state = 0;
         return 0;
     }
-    //dxl_normal.store(state);
+    dxl_normal.store(state);
     return 1;
 
 }
@@ -271,7 +271,7 @@ auto disable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHan
     {
         //std::cout << "Dynamixel " << dxl_id << " has been successfully connected" << std::endl;
     }
-    //dxl_normal.store(state);
+    dxl_normal.store(state);
     return 1;
 }
 
@@ -405,12 +405,12 @@ int main(int argc, char *argv[])
                         {
                             static int dxl_couter;
                             dxl_couter = 0;
-                            //auto start = std::chrono::system_clock::now();
+                            auto start = std::chrono::system_clock::now();
                             while(1)
                             {
                                 if(syn_clock.load() ==0)
                                 {
-                                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                                     std::this_thread::sleep_for(std::chrono::microseconds(500));
                                      continue;
                                 }
                                 if(syn_clock.load()>0)
@@ -423,7 +423,7 @@ int main(int argc, char *argv[])
                                       if (dxl1_active)
                                       {
                                           write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_pos[0][dxl_couter]);
-                                          //read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+                                          read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
                                           auto dxl1 = std::int16_t(dxl_present_position1);
                                           current_pos1.store(1.0*dxl1 / SCALING);
 
@@ -444,9 +444,9 @@ int main(int argc, char *argv[])
                                       }
                                     syn_clock--;//10ms计时标记位
                                     dxl_couter++;//emily舵机位置指向变量
-                                    //auto end = std::chrono::system_clock::now();
-                                    //auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                                    //std::cout <<  "花费了" << double(duration.count()) * std::chrono::milliseconds::period::num / std::chrono::milliseconds::period::den   << "ms" << std::endl;
+                                    auto end = std::chrono::system_clock::now();
+                                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+                                    std::cout <<  "花费了" << double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s" << std::endl;
 
                                   }
                             }
@@ -489,7 +489,7 @@ int main(int argc, char *argv[])
 
 
 	//生成kaanh.xml文档	
-
+/*
 	//-------for qifan robot begin//
 	cs.resetController(kaanh::createControllerQifan().release());
 	cs.resetModel(kaanh::createModelQifan().release());
@@ -503,8 +503,8 @@ int main(int argc, char *argv[])
     cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for qifan robot end// 
+*/
 
-	/*
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
 	cs.resetModel(kaanh::createModelRokae().release());
@@ -516,7 +516,7 @@ int main(int argc, char *argv[])
 	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for rokae robot end// 
-	*/
+
 
     cs.loadXmlFile(xmlpath.string().c_str());
 
