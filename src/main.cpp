@@ -503,7 +503,28 @@ int main(int argc, char *argv[])
 									groupSyncWrite.clearParam();
                                     auto start2 = std::chrono::system_clock::now();
 
-									//syncread function//
+									//simpleread function//
+									if (dxl1_active)
+									{
+										read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+										auto dxl1 = std::int16_t(dxl_present_position1);
+										current_pos1.store(1.0*dxl1 / SCALING);
+
+									}
+									if (dxl2_active)
+									{
+										read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
+										auto dxl2 = std::int16_t(dxl_present_position2);
+										current_pos2.store(1.0*dxl2 / SCALING);
+									}
+									if (dxl3_active)
+									{
+										read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
+										auto dxl3 = std::int16_t(dxl_present_position3);
+										current_pos3.store(1.0*dxl3 / SCALING);
+									}
+
+									//bulkread function//
                                     /*
                                     dxl_comm_result = groupBulkRead.txRxPacket();
 									if (dxl1_active)
