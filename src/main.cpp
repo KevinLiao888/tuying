@@ -335,7 +335,7 @@ int main(int argc, char *argv[])
         int index = 0;
         int dxl_comm_result1 = COMM_TX_FAIL, dxl_comm_result2 = COMM_TX_FAIL, dxl_comm_result3 = COMM_TX_FAIL;             // Communication result
         //int dxl_goal_position[2] = { DXL_MINIMUM_POSITION_VALUE, DXL_MAXIMUM_POSITION_VALUE };         // Goal position
-		int dxl_goal_position = 0;
+        int16_t dxl_goal_position = 0;
         uint8_t dxl_error = 0;                          // Dynamixel error
         uint16_t dxl_present_position1 = 0, dxl_present_position2 = 0, dxl_present_position3 = 0;
 
@@ -416,7 +416,7 @@ int main(int argc, char *argv[])
                         {
                             static int dxl_couter;
                             dxl_couter = 0;
-                            auto start = std::chrono::system_clock::now();
+
                             while(1)
                             {
                                 if(syn_clock.load() ==0)
@@ -431,10 +431,11 @@ int main(int argc, char *argv[])
                                     bool dxl1_active = !dxl_pos[0].empty(), dxl2_active = !dxl_pos[1].empty(), dxl3_active = !dxl_pos[2].empty();
                                     auto data_length = std::max(std::max(dxl_pos[0].size(), dxl_pos[1].size()), dxl_pos[2].size());
 									//syncwrite function//
+                                    auto start1 = std::chrono::system_clock::now();
 									// Allocate goal position value into byte array
 									if (dxl1_active)
 									{
-										dxl_goal_position = dxl_pos[0][dxl_couter];
+                                        dxl_goal_position = std::int16_t(dxl_pos[0][dxl_couter]);
 										param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
 										param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
 										dxl_addparam_result = groupSyncWrite.addParam(DXL_ID1, param_goal_position);
@@ -473,6 +474,7 @@ int main(int argc, char *argv[])
 									if (dxl_comm_result != COMM_SUCCESS) printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
 									// Clear syncwrite parameter storage
 									groupSyncWrite.clearParam();
+                                    auto start2 = std::chrono::system_clock::now();
 
 									//syncread function//
 									if (dxl1_active)
@@ -484,7 +486,7 @@ int main(int argc, char *argv[])
 											fprintf(stderr, "[ID:%03d] groupSyncRead addparam failed", DXL_ID1);
 											break;
 										}
-									}
+									}                                          
 									if (dxl2_active)
 									{
 										// Add parameter storage for Dynamixel#2 present position value
@@ -505,14 +507,15 @@ int main(int argc, char *argv[])
 											break;
 										}
 									}
-									
+
+                                    dxl_comm_result = groupSyncRead.txRxPacket();
 									if (dxl1_active)
 									{
 										// Get Dynamixel#1 present position value
 										dxl_present_position1 = groupSyncRead.getData(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
 										auto dxl1 = std::int16_t(dxl_present_position1);
 										current_pos1.store(1.0*dxl1 / SCALING);
-									}
+									}                                    
 									if (dxl2_active)
 									{
 										// Get Dynamixel#2 present position value
@@ -532,10 +535,12 @@ int main(int argc, char *argv[])
 
 									syn_clock--;//10ms计时标记位
 									dxl_couter++;//emily舵机位置指向变量
-									auto end = std::chrono::system_clock::now();
-									auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-									std::cout <<  "花费了" << double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s" << std::endl;
-
+                                    auto end = std::chrono::system_clock::now();
+                                    auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(start2 - start1);
+                                    auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end - start2);
+                                    std::cout <<  "syncwrite:" << "\t" <<double(duration1.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
+                                        << "\t" << "syncread:"<< "\t" << double(duration2.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
+                                                              << std::endl;
                                 }
                             }
                         }
