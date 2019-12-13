@@ -366,7 +366,33 @@ int main(int argc, char *argv[])
                     if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1))return 0;
                     //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
                     //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))return 0;
-                    read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+
+					// Add parameter storage for Dynamixel#1 present position value
+					dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+					if (dxl_addparam_result != true)
+					{
+						fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
+						continue;
+					}
+					/*
+					// Add parameter storage for Dynamixel#2 present position value
+					dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+					if (dxl_addparam_result != true)
+					{
+						fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
+						continue;
+					}
+
+					// Add parameter storage for Dynamixel#3 present position value
+					dxl_addparam_result = groupBulkRead.addParam(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+					if (dxl_addparam_result != true)
+					{
+						fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID3);
+						continue;
+					}
+					*/
+                    
+					//read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
                     dxl_present_position1 = std::int16_t(dxl_present_position1);
@@ -477,37 +503,6 @@ int main(int argc, char *argv[])
                                     auto start2 = std::chrono::system_clock::now();
 
 									//syncread function//
-									if (dxl1_active)
-									{
-										// Add parameter storage for Dynamixel#1 present position value
-										dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-										if (dxl_addparam_result != true)
-										{
-											fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
-											continue;
-										}
-									}                                          
-									if (dxl2_active)
-									{
-										// Add parameter storage for Dynamixel#2 present position value
-										dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-										if (dxl_addparam_result != true)
-										{
-											fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
-											continue;
-										}
-									}
-									if (dxl3_active)
-									{
-										// Add parameter storage for Dynamixel#3 present position value
-										dxl_addparam_result = groupBulkRead.addParam(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-										if (dxl_addparam_result != true)
-										{
-											fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID3);
-											continue;
-										}
-									}
-
                                     dxl_comm_result = groupBulkRead.txRxPacket();
 									if (dxl1_active)
 									{
@@ -566,7 +561,7 @@ int main(int argc, char *argv[])
                     }
 
                     // Read the position of dynamixel1, dynamixel2, dynamixel3 //
-                    read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+                    //read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
                     auto dxl1 = std::int16_t(dxl_present_position1);
