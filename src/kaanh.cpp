@@ -22,6 +22,7 @@ extern std::mutex dynamixel_mutex;
 extern std::atomic_int mode_dynamixel;
 extern std::atomic_bool enable_dynamixel_auto;
 extern std::atomic_bool enable_dynamixel_manual;
+extern std::atomic_bool enable_dynamixel_home;
 extern std::atomic_int is_enabled;
 extern std::atomic_int16_t target_pos1, target_pos2, target_pos3;
 extern std::atomic_int16_t current_pos1, current_pos2, current_pos3;
@@ -552,9 +553,9 @@ namespace kaanh
 		auto out_data = std::any_cast<GetParam &>(param);
 		
 		//舵机//
-        out_data.motion_pos[7] = current_pos1.load()*10;
-        out_data.motion_pos[8] = current_pos2.load()*10;
-        out_data.motion_pos[9] = current_pos3.load()*10;
+        out_data.motion_pos[7] = current_pos1.load();
+        out_data.motion_pos[8] = current_pos2.load();
+        out_data.motion_pos[9] = current_pos3.load();
         //out_data.motion_pos[7] = target_pos1.load()*10;
         //out_data.motion_pos[8] = target_pos2.load()*10;
         //out_data.motion_pos[9] = target_pos3.load()*10;
@@ -4030,7 +4031,7 @@ namespace kaanh
 	}
 
 
-    // 舵机moveabsj //
+    // 舵机找home //
     struct DHomeParam
     {
         std::vector<double> joint_pos_vec;
@@ -4052,67 +4053,11 @@ namespace kaanh
                 param.joint_active_vec.resize(param.d_num, false);
                 param.joint_active_vec.at(std::stoi(cmd_param.second)) = true;
             }
-            else if (cmd_param.first == "pos")
-            {
-                aris::core::Matrix mat = target.model->calculator().calculateExpression(cmd_param.second);
-                if (mat.size() == 1)param.joint_pos_vec.resize(param.d_num, mat.toDouble());
-                else
-                {
-                    param.joint_pos_vec.resize(mat.size());
-                    std::copy(mat.begin(), mat.end(), param.joint_pos_vec.begin());
-                }
-            }
         }
-        auto cur_pos1 = target_pos1.load();
-        auto cur_pos2 = target_pos2.load();
-        auto cur_pos3 = target_pos3.load();
-        auto end_pos1 = int(11.378*param.joint_pos_vec[0]);
-        auto end_pos2 = int(11.378*param.joint_pos_vec[1]);
-        auto end_pos3 = int(11.378*param.joint_pos_vec[2]);
-
-        auto total_count = std::max(std::max(std::abs(cur_pos1-end_pos1), std::abs(cur_pos2-end_pos2)), std::abs(cur_pos3-end_pos3));
-
-        for(aris::Size i = 1; i <= total_count; i++)
-        {
-            if (param.joint_active_vec[0])
-            {
-                if(i<=std::abs(cur_pos1-end_pos1))
-                {
-                    int p1 = cur_pos1 + i*(end_pos1 - cur_pos1)/std::abs(end_pos1 - cur_pos1);
-                    p1 = std::min(28672, std::max(p1, -28672));
-                    target_pos1.store(p1);
-                }
-            }
-            if (param.joint_active_vec[1])
-            {
-                if(i<=std::abs(cur_pos2-end_pos2))
-                {
-                    int p2 = cur_pos2 + i*(end_pos2 - cur_pos2)/std::abs(end_pos2 - cur_pos2);
-                    p2 = std::min(28672, std::max(p2, -28672));
-                    target_pos2.store(p2);
-                }
-            }
-            if (param.joint_active_vec[2])
-            {
-                if(i<=std::abs(cur_pos3-end_pos3))
-                {
-                    int p3 = cur_pos3 + i*(end_pos3 - cur_pos3)/std::abs(end_pos3 - cur_pos3);
-                    p3 = std::min(28672, std::max(p3, -28672));
-                    target_pos3.store(p3);
-                }
-            }
-            enable_dynamixel_manual.store(1);
-        }
-
-
-        std::cout << "target_pos1:" << target_pos1 << std::endl;
-        std::cout << "target_pos2:" << target_pos2 << std::endl;
-        std::cout << "target_pos3:" << target_pos3 << std::endl;
-
         std::vector<std::pair<std::string, std::any>> ret;
         target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
-        //enable_dynamixel_manual.store(1);
+		enable_dynamixel_home.store(true);
     }
     auto DHome::collectNrt(PlanTarget &target)->void {}
     DHome::DHome(const std::string &name) :Plan(name)
@@ -4124,7 +4069,6 @@ namespace kaanh
             "			<Param name=\"all\" abbreviation=\"a\"/>"
             "			<Param name=\"motion_id\" abbreviation=\"m\" default=\"0\"/>"
             "		</UniqueParam>"
-            "		<Param name=\"pos\" default=\"0\"/>"
             "	</GroupParam>"
             "</Command>");
     }
@@ -4170,23 +4114,22 @@ namespace kaanh
         auto end_pos2 = int(11.378*param.joint_pos_vec[1]);
         auto end_pos3 = int(11.378*param.joint_pos_vec[2]);
 
-
         if (param.joint_active_vec[0])
         {
-            target_pos1.store(int(11.378*param.joint_pos_vec[0]));
+            target_pos1.store(end_pos1);
         }
         if (param.joint_active_vec[1])
         {
-            target_pos2.store(int(11.378*param.joint_pos_vec[1]));
+            target_pos2.store(end_pos2);
         }
         if (param.joint_active_vec[2])
         {
-            target_pos3.store(int(11.378*param.joint_pos_vec[2]));
+            target_pos3.store(end_pos3);
         }
 			
-		std::cout << "target_pos1:" << target_pos1 << std::endl;
-		std::cout << "target_pos2:" << target_pos2 << std::endl;
-		std::cout << "target_pos3:" << target_pos3 << std::endl;
+		std::cout << "target_pos1:" << end_pos1 << std::endl;
+		std::cout << "target_pos2:" << end_pos2 << std::endl;
+		std::cout << "target_pos3:" << end_pos3 << std::endl;
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;

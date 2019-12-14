@@ -66,6 +66,7 @@ const int BAUDRATE3 = 1000000;
 #define DXL_MINIMUM_POSITION_VALUE      -28672                 // Dynamixel will rotate between this value
 #define DXL_MAXIMUM_POSITION_VALUE      28672                // and this value (note that the Dynamixel would not move when the position value is out of movable range. Check e-manual about the range of the Dynamixel you use.)
 #define DXL_MOVING_STATUS_THRESHOLD     10                  // Dynamixel moving status threshold
+#define ERRBIT_OVERLOAD         32      // The current load cannot be controlled by the set torque.
 
 #define ESC_ASCII_VALUE                 0x1b
 #define SCALING                         11.378
@@ -78,10 +79,14 @@ std::atomic_int syn_clock = 0;
 std::atomic_int mode_dynamixel = 2;		//mode_dynamixel——0:manual, 1:auto, 2:NA
 std::atomic_bool find_zero = false;		//找零
 std::atomic_bool enable_dynamixel_auto = false;		//enable_dynamixel_auto——0:disable dynamixel auto, 1:enable dynamixel auto
-std::atomic_bool enable_dynamixel_manual = false;		//enable_dynamixel_manual——0:disable dynamixel manual, 1:enable dynamixel manual
-std::atomic_int is_enabled = 2;		//is_enabled——0:disable, 1:enable, 2:NA
+std::atomic_bool enable_dynamixel_manual = false;	//enable_dynamixel_manual——0:disable dynamixel manual, 1:enable dynamixel manual
+std::atomic_bool enable_dynamixel_home = false;		//enable_dynamixel_home——1:enable dynamixel homing
+std::atomic_bool dx1_home_succsess = false, dx2_home_succsess = false, dx3_home_succsess = false;				//home_succsess——1:home_succsess
+std::atomic_int is_enabled = 2;						//is_enabled——0:disable, 1:enable, 2:NA
 std::atomic_int16_t target_pos1 = 0, target_pos2 = 0, target_pos3 = 0;
 std::atomic_int16_t current_pos1 = 0, current_pos2 = 0, current_pos3 = 0;
+std::atomic_int16_t pos1_ref = 0, pos2_ref = 0, pos3_ref = 0;			//第一次装机时位置标定值
+std::atomic_int16_t pos1_offset = 0, pos2_offset = 0, pos3_offset = 0;	//相对于第一次装机位置参数的偏置
 std::vector<std::vector<double>> dxl_pos;
 bool dxl_addparam_result = false;                 // addParam result
 bool dxl_getdata_result = false;                  // GetParam result
@@ -436,9 +441,74 @@ int main(int argc, char *argv[])
                             //auto pos2 = target_pos2.load();
                             //auto pos3 = target_pos3.load();
                             write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, pos1);
-                            //write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, pos2);
+                           //write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, pos2);
                            //write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, pos3);
                         }
+						if (enable_dynamixel_home.load())
+						{
+							int16_t step = 2;	//homing speed
+							int16_t pos = 0;
+
+							int16_t pos1 = current_pos1.load()*SCALING;
+							for (int pos = pos1; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
+							{
+								auto dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, DXL_ID1, ADDR_MX_GOAL_POSITION, pos, &dxl_error);
+								if (dxl_error & ERRBIT_OVERLOAD)
+								{
+									pos1_offset = pos1_ref - pos;
+									std::cout << "pos1:" << pos << "\t" << "pos1_offset:" << pos1_offset << "\t" << std::endl;
+									dx1_home_succsess.store(true);
+									break;
+								}
+								std::this_thread::sleep_for(std::chrono::milliseconds(10));
+							}
+							if (pos < DXL_MINIMUM_POSITION_VALUE)
+							{
+								dx1_home_succsess.store(false);
+								std::cout << "dx1 homing failed:" << std::endl;
+							}
+							/*
+							int16_t pos2 = current_pos2.load()*SCALING;
+							for (int pos = pos2; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
+							{
+								auto dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, DXL_ID2, ADDR_MX_GOAL_POSITION, pos, &dxl_error);
+								if (dxl_error & ERRBIT_OVERLOAD)
+								{
+									pos2_offset = pos2_ref - pos;
+									std::cout << "pos2:" << pos << "\t" << "pos2_offset:" << pos2_offset << "\t" << std::endl;
+									dx2_home_succsess.store(true);
+									break;
+								}
+								std::this_thread::sleep_for(std::chrono::milliseconds(10));
+							}
+							if (pos < DXL_MINIMUM_POSITION_VALUE)
+							{
+								dx2_home_succsess.store(false);
+								std::cout << "dx2 homing failed:"<< std::endl;
+							}
+
+							int16_t pos3 = current_pos3.load()*SCALING;
+							for (int pos = pos3; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
+							{
+								auto dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, DXL_ID3, ADDR_MX_GOAL_POSITION, pos, &dxl_error);
+								if (dxl_error & ERRBIT_OVERLOAD)
+								{
+									pos3_offset = pos3_ref - pos;
+									std::cout << "pos3:" << pos << "\t" << "pos3_offset:" << pos3_offset << "\t" << std::endl;
+									dx3_home_succsess.store(true);
+									break;
+								}
+								std::this_thread::sleep_for(std::chrono::milliseconds(10));
+							}
+							if (pos < DXL_MINIMUM_POSITION_VALUE)
+							{
+								dx3_home_succsess.store(false);
+								std::cout << "dx3 homing failed:"<< std::endl;
+							}
+							*/
+
+							enable_dynamixel_home.store(false);
+						}
                     }
                     // auto mode //
                     else if (mode == 1)
@@ -464,6 +534,7 @@ int main(int argc, char *argv[])
                                     auto data_length = std::max(std::max(dxl_pos[0].size(), dxl_pos[1].size()), dxl_pos[2].size());
 									//syncwrite function//
                                     auto start1 = std::chrono::system_clock::now();
+									
 									// Allocate goal position value into byte array
 									if (dxl1_active)
 									{
@@ -509,7 +580,7 @@ int main(int argc, char *argv[])
                                     auto start2 = std::chrono::system_clock::now();
 
 									//simpleread function//
-                                                              /*
+                                    /*
 									if (dxl1_active)
 									{
 										read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
@@ -529,9 +600,9 @@ int main(int argc, char *argv[])
 										auto dxl3 = std::int16_t(dxl_present_position3);
 										current_pos3.store(1.0*dxl3 / SCALING);
 									}
-*/
+									*/
+									
 									//bulkread function//
-
                                     dxl_comm_result = groupBulkRead.txRxPacket();
 									if (dxl1_active)
 									{
@@ -572,7 +643,6 @@ int main(int argc, char *argv[])
 										auto dxl3 = std::int16_t(dxl_present_position3);
 										current_pos3.store(1.0*dxl3 / SCALING);
 									}
-
 
                                     if(dxl_couter>=data_length-1) break;
 
