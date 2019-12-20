@@ -244,7 +244,7 @@ namespace kaanh
         double max_pos = 1.29;
         double min_pos = 0;
         double max_vel = 0.5;	//0.1m/s
-        double max_acc = 2.0;	//1.0m/s2
+        double max_acc = 1.0;	//1.0m/s2
 		std::string xml_str =
 			"<EthercatMotion phy_id=\"" + std::to_string(6) + "\" product_code=\"0x6038000D\""
 			" vendor_id=\"0x0000066F\" revision_num=\"0x00010000\" dc_assign_activate=\"0x0300\""
@@ -5833,7 +5833,7 @@ namespace kaanh
 		SavePParam param;
 		std::string point_name;
 		nlohmann::json js;
-		
+
 		for (auto &p : params)
 		{
 			if (p.first == "nf")
@@ -5845,13 +5845,24 @@ namespace kaanh
 		if (param.newfile)
 		{
 			//read json file
-            std::ifstream file("/home/kaanh/Desktop/emily/json/teaching.json");
+#ifdef UNIX
+			std::ifstream file("/home/kaanh/Desktop/emily/json/teaching.json");
+#endif // UNIX
+#ifdef WIN32
+			std::ifstream file("./json/teaching.json");
+#endif // WIN32
 			file >> js;
             file.close();
 			time_t t = time(0);
 			tm* p = localtime(&t);
             char filename[100] = { 0 };
-            sprintf(filename, "/home/kaanh/Desktop/emily/json/%d%02d%02d%02d%02d%02d.json", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
+#ifdef UINX
+			sprintf(filename, "/home/kaanh/Desktop/emily/json/%d%02d%02d%02d%02d%02d.json", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
+#endif // UINX
+			
+#ifdef WIN32
+			sprintf(filename, "./json/%d%02d%02d%02d%02d%02d.json", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
+#endif // WIN32      
             p = NULL;
             delete (p);
 
@@ -5870,14 +5881,28 @@ namespace kaanh
 
 			//write json file
             std::ofstream os_write;
-            os_write.open("/home/kaanh/Desktop/emily/json/teaching.json");
+#ifdef UINX
+			os_write.open("/home/kaanh/Desktop/emily/json/teaching.json");
+#endif // UINX
+
+#ifdef WIN32
+			os_write.open("./json/teaching.json");
+#endif // WIN32
+            
             os_write << js.dump(2) << std::endl;
             os_write.close();
 		}
 		else
 		{
 			//read json file
-            std::ifstream file("/home/kaanh/Desktop/emily/json/teaching.json");
+#ifdef UINX
+			std::ifstream file("/home/kaanh/Desktop/emily/json/teaching.json");
+#endif // UINX
+
+#ifdef WIN32
+			std::ifstream file("./json/teaching.json");
+#endif // WIN32
+            
 			file >> js;
 			//get new pos
 			point_name = "p" + std::to_string(++p_num);
@@ -5885,7 +5910,14 @@ namespace kaanh
 			js[point_name] = temp_pos;
 			//write json file
 			std::ofstream os;
-            os.open("/home/kaanh/Desktop/emily/json/teaching.json");
+#ifdef UINX
+			os.open("/home/kaanh/Desktop/emily/json/teaching.json");
+#endif // UINX
+
+#ifdef WIN32
+			os.open("./json/teaching.json");
+#endif // WIN32
+            
 			os << js.dump(2) << std::endl;
 			os.close();
 		}
