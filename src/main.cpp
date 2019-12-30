@@ -24,10 +24,13 @@
 #define ADDR_MX_TORQUE_ENABLE           24                  // Control table address is different in Dynamixel model
 #define ADDR_MX_GOAL_POSITION           30
 #define ADDR_MX_PRESENT_POSITION        36
+#define ADDR_MX_PRESENT_LOAD            40
+
 
 // Data Byte Length
 #define LEN_MX_GOAL_POSITION            2
 #define LEN_MX_PRESENT_POSITION         2
+#define LEN_MX_PRESENT_LOAD             2
 
 // Protocol version
 #define PROTOCOL_VERSION                1.0                 // See which protocol version is used in the Dynamixel
@@ -42,23 +45,13 @@
 #define BAUDRATE2                       1000000
 #define BAUDRATE3                       1000000
 
-/*
-const int DXL_ID1 = 1;
-const int DXL_ID2 = 2;
-const int DXL_ID3 = 3;
-const int BAUDRATE = 57600;
-const int BAUDRATE1 = 57600;
-const int BAUDRATE2 = 1000000;
-const int BAUDRATE3 = 1000000;
-*/
-
 #ifdef UNIX
-    #define DEVICENAME                      "/dev/ttyUSB0"      // Check which port is being used on your controller
+    #define DEVICENAME                  "/dev/ttyUSB0"      // Check which port is being used on your controller
                                                                 // ex) Windows: "COM1"   Linux: "/dev/ttyUSB0" Mac: "/dev/tty.usbserial-*"
 #endif
 
 #ifdef WIN32
-    #define DEVICENAME                      "COM6"
+    #define DEVICENAME                  "COM6"
 #endif
 
 #define TORQUE_ENABLE                   1                   // Value for enabling the torque
@@ -300,8 +293,8 @@ auto modelxmlpath = std::filesystem::absolute(".");
 const std::string xmlfile = "kaanh.xml";
 const std::string uixmlfile = "interface_kaanh.xml";
 //for qifan robot//
-//const std::string modelxmlfile = "model_qifan.xml";
-const std::string modelxmlfile = "model_rokae.xml";
+const std::string modelxmlfile = "model_qifan.xml";
+//const std::string modelxmlfile = "model_rokae.xml";
 
 
 int main(int argc, char *argv[])
@@ -343,6 +336,7 @@ int main(int argc, char *argv[])
         int16_t dxl_goal_position = 0;
         uint8_t dxl_error = 0;                          // Dynamixel error
         uint16_t dxl_present_position1 = 0, dxl_present_position2 = 0, dxl_present_position3 = 0;
+        uint16_t dxl_present_load1 = 0, dxl_present_load2 = 0, dxl_present_load3 = 0;
 
         // Open port //
         if (portHandler->openPort())
@@ -372,38 +366,38 @@ int main(int argc, char *argv[])
                     //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
                     //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))return 0;
 
-
-					// Add parameter storage for Dynamixel#1 present position value
+                    groupBulkRead.clearParam();
+                    // Add parameter storage for Dynamixel#1 present position value
                     std::cout << "read1" <<std::endl;
-					dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-					if (dxl_addparam_result != true)
-					{
-						fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
-                        continue;
-					}
-                    /*
-					// Add parameter storage for Dynamixel#2 present position value
+                    dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+                    if (dxl_addparam_result != true)
+                    {
+                        fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
+                        break;
+                    }
+
+
+                    // Add parameter storage for Dynamixel#2 present position value
                     std::cout << "read2" <<std::endl;
-					dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-					if (dxl_addparam_result != true)
-					{
+                    dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+                    if (dxl_addparam_result != true)
+                    {
 
-						fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
-                        continue;
-					}
+                        fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
+                        break;
+                    }
 
-					// Add parameter storage for Dynamixel#3 present position value
+                    // Add parameter storage for Dynamixel#3 present position value
                     std::cout << "read3" <<std::endl;
-					dxl_addparam_result = groupBulkRead.addParam(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-					if (dxl_addparam_result != true)
-					{
+                    dxl_addparam_result = groupBulkRead.addParam(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+                    if (dxl_addparam_result != true)
+                    {
 
-						fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID3);
-						continue;
-					}
-                    */
+                        fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID3);
+                        break;
+                    }
 
-                    //read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+                    read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
                     dxl_present_position1 = std::int16_t(dxl_present_position1);
@@ -413,8 +407,8 @@ int main(int argc, char *argv[])
 					std::cout << "pos2:" << dxl_present_position2 << std::endl;
                     std::cout << "pos3:" << dxl_present_position3 << std::endl;
                     target_pos1.store(dxl_present_position1);
-                    //target_pos2.store(dxl_present_position2);
-                    //target_pos3.store(dxl_present_position3);
+                    target_pos2.store(dxl_present_position2);
+                    target_pos3.store(dxl_present_position3);
                     is_enabled.store(2);
                     enabled = true;
 					dxl_enabled.store(true);
@@ -428,6 +422,7 @@ int main(int argc, char *argv[])
                     is_enabled.store(2);
                     enabled = false;
 					dxl_enabled.store(false);
+                    groupBulkRead.clearParam();
                 }
                 if (enabled)
                 {
@@ -438,11 +433,11 @@ int main(int argc, char *argv[])
                         if (enable_dynamixel_manual.exchange(false))
                         {
                             auto pos1 = target_pos1.load();
-                            //auto pos2 = target_pos2.load();
-                            //auto pos3 = target_pos3.load();
+                            auto pos2 = target_pos2.load();
+                            auto pos3 = target_pos3.load();
                             write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, pos1);
-                           //write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, pos2);
-                           //write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, pos3);
+                            //write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, pos2);
+                            //write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, pos3);
                         }
 						if (enable_dynamixel_home.load())
 						{
@@ -450,16 +445,36 @@ int main(int argc, char *argv[])
 							int16_t pos = 0;
 
 							int16_t pos1 = current_pos1.load()*SCALING;
-							for (int pos = pos1; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
+                            for (int pos = pos1; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
 							{
 								auto dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, DXL_ID1, ADDR_MX_GOAL_POSITION, pos, &dxl_error);
-								if (dxl_error & ERRBIT_OVERLOAD)
+                                if (dxl_error & ERRBIT_OVERLOAD)
+                                {
+                                    std::cout << "overload" << std::endl;
+                                    dx1_home_succsess.store(false);
+                                    break;
+                                }
+                                auto dxl_load_result = packetHandler->read2ByteTxRx(portHandler, DXL_ID1, ADDR_MX_PRESENT_LOAD, &dxl_present_load1, &dxl_error);
+                                if (dxl_load_result != COMM_SUCCESS)
+                                {
+                                    printf("%s\n", packetHandler->getTxRxResult(dxl_load_result));
+                                    break;
+                                }
+                                else if (dxl_error != 0)
+                                {
+                                    printf("%s\n", packetHandler->getRxPacketError(dxl_error));
+                                    break;
+                                }
+
+                                if (dxl_present_load1>=100)
 								{
 									pos1_offset = pos1_ref - pos;
 									std::cout << "pos1:" << pos << "\t" << "pos1_offset:" << pos1_offset << "\t" << std::endl;
 									dx1_home_succsess.store(true);
 									break;
 								}
+
+
 								std::this_thread::sleep_for(std::chrono::milliseconds(10));
 							}
 							if (pos < DXL_MINIMUM_POSITION_VALUE)
@@ -467,7 +482,7 @@ int main(int argc, char *argv[])
 								dx1_home_succsess.store(false);
 								std::cout << "dx1 homing failed:" << std::endl;
 							}
-							/*
+/*
 							int16_t pos2 = current_pos2.load()*SCALING;
 							for (int pos = pos2; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
 							{
@@ -505,8 +520,7 @@ int main(int argc, char *argv[])
 								dx3_home_succsess.store(false);
 								std::cout << "dx3 homing failed:"<< std::endl;
 							}
-							*/
-
+*/
 							enable_dynamixel_home.store(false);
 						}
                     }
@@ -602,6 +616,7 @@ int main(int argc, char *argv[])
 									}
 									*/
 									
+
 									//bulkread function//
                                     dxl_comm_result = groupBulkRead.txRxPacket();
 									if (dxl1_active)
@@ -644,6 +659,7 @@ int main(int argc, char *argv[])
 										current_pos3.store(1.0*dxl3 / SCALING);
 									}
 
+
                                     if(dxl_couter>=data_length-1) break;
 
 									syn_clock--;//10ms计时标记位
@@ -661,15 +677,17 @@ int main(int argc, char *argv[])
                     }
 
                     // Read the position of dynamixel1, dynamixel2, dynamixel3 //
+
                     read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
-                    //read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
-                    //read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
+//                    read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
+//                    read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
                     auto dxl1 = std::int16_t(dxl_present_position1);
                     auto dxl2 = std::int16_t(dxl_present_position2);
                     auto dxl3 = std::int16_t(dxl_present_position3);
                     current_pos1.store(1.0*dxl1 / SCALING);
-                    //current_pos2.store(1.0*dxl2 / SCALING);
-                    //current_pos3.store(1.0*dxl3 / SCALING);
+                    current_pos2.store(1.0*dxl2 / SCALING);
+                    current_pos3.store(1.0*dxl3 / SCALING);
+
                 }
             }
             catch (std::exception &e)
@@ -695,7 +713,7 @@ int main(int argc, char *argv[])
 
 
 	//生成kaanh.xml文档	
-/*
+
 	//-------for qifan robot begin//
 	cs.resetController(kaanh::createControllerQifan().release());
 	cs.resetModel(kaanh::createModelQifan().release());
@@ -709,8 +727,8 @@ int main(int argc, char *argv[])
     cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for qifan robot end// 
-*/
 
+/*
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
 	cs.resetModel(kaanh::createModelRokae().release());
@@ -722,7 +740,7 @@ int main(int argc, char *argv[])
 	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for rokae robot end// 
-
+*/
 
     cs.loadXmlFile(xmlpath.string().c_str());
 

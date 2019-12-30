@@ -468,7 +468,7 @@ namespace kaanh
 		par.motion_state.resize(7, 0);
 		std::any param = par;
 		//std::any param = std::make_any<GetParam>();
-        int motion_num = 6;
+        int motion_num = 7;
 		target.server->getRtData([&](aris::server::ControlServer& cs, const aris::plan::PlanTarget *target, std::any& data)->void
 		{
 			for (aris::Size i(-1); ++i < cs.model().partPool().size();)
@@ -921,7 +921,6 @@ namespace kaanh
 			target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
 			return;
 		}
-		std::cout << "start" << std::endl;
 		auto c = target.controller;
 		MoveEParam param;
 		param.active.clear();
@@ -3870,7 +3869,7 @@ namespace kaanh
             return;
         }
 		is_enabled.store(1);
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
@@ -3936,7 +3935,7 @@ namespace kaanh
 			"<Command name=\"dj1\">"
 			"	<UniqueParam default=\"group\">"
 			"		<GroupParam name=\"group\">"
-			"			<Param name=\"step\" default=\"2\"/>"
+            "			<Param name=\"step\" default=\"0.3\"/>"
 			"			<Param name=\"direction\" default=\"1\"/>"
 			"		</GroupParam>"
 			"		<Param name=\"stop\"/>"
@@ -3979,7 +3978,7 @@ namespace kaanh
 			"<Command name=\"dj2\">"
 			"	<UniqueParam default=\"group\">"
 			"		<GroupParam name=\"group\">"
-			"			<Param name=\"step\" default=\"2\"/>"
+            "			<Param name=\"step\" default=\"0.3\"/>"
 			"			<Param name=\"direction\" default=\"1\"/>"
 			"		</GroupParam>"
 			"		<Param name=\"stop\"/>"
@@ -4022,7 +4021,7 @@ namespace kaanh
 			"<Command name=\"dj3\">"
 			"	<UniqueParam default=\"group\">"
 			"		<GroupParam name=\"group\">"
-			"			<Param name=\"step\" default=\"2\"/>"
+            "			<Param name=\"step\" default=\"0.3\"/>"
 			"			<Param name=\"direction\" default=\"1\"/>"
 			"		</GroupParam>"
 			"		<Param name=\"stop\"/>"
@@ -5778,7 +5777,7 @@ namespace kaanh
 
 
 	// 保存示教点 //
-	auto SavePoint::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	auto SaveHome::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
 		auto&cs = aris::server::ControlServer::instance();
 	
@@ -5811,12 +5810,211 @@ namespace kaanh
 		target.ret = ret;
 		target.option = aris::plan::Plan::NOT_RUN_EXECUTE_FUNCTION;
 	}
-	SavePoint::SavePoint(const std::string &name) :Plan(name)
+	SaveHome::SaveHome(const std::string &name) :Plan(name)
 	{
 		command().loadXmlStr(
-			"<Command name=\"savepoint\">"
+			"<Command name=\"savehome\">"
 			"	<GroupParam>"
             "		<Param name=\"name\" default=\"homepoint\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 多关节混合插值梯形轨迹；速度前馈 //
+	struct ToHomeParam
+	{
+		std::vector<Size> total_count_vec;
+		std::vector<double> axis_begin_pos_vec;
+		std::vector<double> axis_pos_vec;
+		std::vector<double> axis_vel_vec;
+		std::vector<double> axis_acc_vec;
+		std::vector<double> axis_dec_vec;
+	};
+	auto ToHome::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		auto c = target.controller;
+		ToHomeParam param;
+		param.total_count_vec.resize(7, 1);
+		param.axis_begin_pos_vec.resize(7, 0.0);
+
+		//params.at("pos")
+		for (auto &p : params)
+		{
+			if (p.first == "pos")
+			{
+				if (p.second == "current_pos")
+				{
+					auto pos = dynamic_cast<aris::dynamic::MatrixVariable*>(&*target.model->variablePool().findByName("homepoint"))->data();
+				}
+				else
+				{
+					auto pos = target.model->calculator().calculateExpression(p.second);
+					if (pos.size() == 1)
+					{
+						param.axis_pos_vec.resize(param.axis_begin_pos_vec.size(), pos.toDouble());
+					}
+					else if (pos.size() == param.axis_begin_pos_vec.size())
+					{
+						param.axis_pos_vec.assign(pos.begin(), pos.end());
+					}
+					else
+					{
+						throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
+					}
+					for (int i = 0; i < param.axis_pos_vec.size(); i++)
+					{
+						if (i < 6)
+						{
+							param.axis_pos_vec[i] = param.axis_pos_vec[i] / 180.0*PI;
+						}
+					}
+				}
+			}
+			else if (p.first == "vel")
+			{
+				auto v = target.model->calculator().calculateExpression(p.second);
+				if (v.size() == 1)
+				{
+					param.axis_vel_vec.resize(param.axis_begin_pos_vec.size(), v.toDouble());
+				}
+				else if (v.size() == param.axis_begin_pos_vec.size())
+				{
+					param.axis_vel_vec.assign(v.begin(), v.end());
+				}
+				else
+				{
+					throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
+				}
+
+				for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+				{
+					//if (param.axis_vel_vec[i] > 1.0 || param.axis_vel_vec[i] < 0.01)
+					//	throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
+					if (param.axis_vel_vec[i] > 1.0)
+					{
+						param.axis_vel_vec[i] = 1.0;
+					}
+					if (param.axis_vel_vec[i] < 0.0)
+					{
+						param.axis_vel_vec[i] = 0.0;
+					}
+					param.axis_vel_vec[i] = param.axis_vel_vec[i] * c->motionPool()[i].maxVel();
+				}
+			}
+			else if (p.first == "acc")
+			{
+				auto a = target.model->calculator().calculateExpression(p.second);
+				if (a.size() == 1)
+				{
+					param.axis_acc_vec.resize(param.axis_begin_pos_vec.size(), a.toDouble());
+				}
+				else if (a.size() == param.axis_begin_pos_vec.size())
+				{
+					param.axis_acc_vec.assign(a.begin(), a.end());
+				}
+				else
+				{
+					throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
+				}
+
+				for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+				{
+					if (param.axis_acc_vec[i] > 1.0)
+					{
+						param.axis_acc_vec[i] = 1.0;
+					}
+					if (param.axis_acc_vec[i] < 0.0)
+					{
+						param.axis_acc_vec[i] = 0.0;
+					}
+					param.axis_acc_vec[i] = param.axis_acc_vec[i] * c->motionPool()[i].maxAcc();
+				}
+			}
+			else if (p.first == "dec")
+			{
+				auto d = target.model->calculator().calculateExpression(p.second);
+				if (d.size() == 1)
+				{
+					param.axis_dec_vec.resize(param.axis_begin_pos_vec.size(), d.toDouble());
+				}
+				else if (d.size() == param.axis_begin_pos_vec.size())
+				{
+					param.axis_dec_vec.assign(d.begin(), d.end());
+				}
+				else
+				{
+					throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
+				}
+
+				for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+				{
+					if (param.axis_dec_vec[i] > 1.0)
+					{
+						param.axis_dec_vec[i] = 1.0;
+					}
+					if (param.axis_dec_vec[i] < 0.0)
+					{
+						param.axis_dec_vec[i] = 0.0;
+					}
+					param.axis_dec_vec[i] = param.axis_dec_vec[i] * c->motionPool()[i].minAcc();
+				}
+			}
+		}
+		target.param = param;
+
+		//std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::USE_VEL_OFFSET);
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+
+	}
+	auto ToHome::executeRT(PlanTarget &target)->int
+	{
+		//获取驱动//
+		auto controller = target.controller;
+		auto &param = std::any_cast<ToHomeParam&>(target.param);
+		static double begin_pos[7];
+		static double pos[7];
+		// 取得起始位置 //
+		if (target.count == 1)
+		{
+			for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+			{
+				param.axis_begin_pos_vec[i] = controller->motionPool().at(i).targetPos();
+			}
+		}
+		// 设置驱动器的位置 //
+
+		for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+		{
+			double p, v, a;
+			aris::plan::moveAbsolute(target.count, param.axis_begin_pos_vec[i], param.axis_pos_vec[i], param.axis_vel_vec[i] / 1000
+				, param.axis_acc_vec[i] / 1000 / 1000, param.axis_dec_vec[i] / 1000 / 1000, p, v, a, param.total_count_vec[i]);
+			controller->motionAtAbs(i).setTargetPos(p);
+		}
+		
+		if (target.model->solverPool().at(1).kinPos())return -1;
+
+		// 打印电流 //
+		auto &cout = controller->mout();
+
+		// log 电流 //
+		auto &lout = controller->lout();
+
+		return (static_cast<int>(*std::max_element(param.total_count_vec.begin(), param.total_count_vec.end())) > target.count) ? 1 : 0;
+	}
+	auto ToHome::collectNrt(PlanTarget &target)->void {}
+	ToHome::ToHome(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"tohome\">"
+			"	<GroupParam>"
+			"		<Param name=\"pos\" default=\"current_pos\"/>"
+			"		<Param name=\"vel\" default=\"{0.1,0.1,0.1,0.1,0.1,0.1,0.1}\" abbreviation=\"v\"/>"
+			"		<Param name=\"acc\" default=\"{0.1,0.1,0.1,0.1,0.1,0.1,0.1}\" abbreviation=\"a\"/>"
+			"		<Param name=\"dec\" default=\"{0.1,0.1,0.1,0.1,0.1,0.1,0.1}\" abbreviation=\"d\"/>"
+			"		<Param name=\"ab\" default=\"1\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -5893,16 +6091,16 @@ namespace kaanh
             os_write.close();
 		}
 		else
-		{
-			//read json file
-#ifdef UINX
-			std::ifstream file("/home/kaanh/Desktop/emily/json/teaching.json");
-#endif // UINX
+        {
 
-#ifdef WIN32
-			std::ifstream file("./json/teaching.json");
-#endif // WIN32
-            
+//#ifdef UINX
+			std::ifstream file("/home/kaanh/Desktop/emily/json/teaching.json");
+//#endif
+
+//#ifdef WIN32
+//			std::ifstream file("./json/teaching.json");
+//#endif // WIN32
+
 			file >> js;
 			//get new pos
 			point_name = "p" + std::to_string(++p_num);
@@ -6071,10 +6269,10 @@ namespace kaanh
         plan_root->planPool().add<aris::plan::Recover>();
         auto &rs = plan_root->planPool().add<aris::plan::Reset>();
         //for qifan robot//
-        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
+        rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5,0.0}");
 
         //for rokae robot//
-        rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
+        //rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
 
         plan_root->planPool().add<aris::plan::MoveAbsJ>();
         plan_root->planPool().add<aris::plan::MoveL>();
@@ -6124,7 +6322,7 @@ namespace kaanh
 		plan_root->planPool().add<kaanh::SetUI>();
 		plan_root->planPool().add<kaanh::SetDriver>();
 		plan_root->planPool().add<kaanh::SaveConfig>();
-        plan_root->planPool().add<kaanh::SavePoint>();
+        plan_root->planPool().add<kaanh::SaveHome>();
 		plan_root->planPool().add<kaanh::SaveP>();
 		plan_root->planPool().add<kaanh::SetVel>();
 		plan_root->planPool().add<kaanh::UDVel>();
