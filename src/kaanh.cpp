@@ -1145,10 +1145,9 @@ namespace kaanh
 		auto &param = std::any_cast<MoveEParam&>(target.param);
 		auto controller = target.controller;
 		static aris::Size total_count = 1;
-        //syn_clock.store(1);
 		if (target.count % 10 == 0)
 		{
-			syn_clock++;
+			syn_clock.store(1);
 		}
 
 #ifdef WIN32
@@ -3916,7 +3915,8 @@ namespace kaanh
 				step = 0;
 			}
 		}
-        dx_pos1 = target_pos1.load();
+        
+		dx_pos1 = current_pos1.load();
 		dx_pos1 += direction * step;
 		dx_pos1 = std::min(28672,std::max(dx_pos1,-28672));
 		target_pos1.store(dx_pos1);
@@ -3960,7 +3960,8 @@ namespace kaanh
 				step = 0;
 			}
 		}
-        dx_pos2 = target_pos2.load();
+        
+		dx_pos2 = current_pos2.load();
 		dx_pos2 += direction * step;
 		dx_pos2 = std::min(28672, std::max(dx_pos2, -28672));
 		target_pos2.store(dx_pos2);
@@ -4003,7 +4004,8 @@ namespace kaanh
 				step = 0;
 			}
 		}
-        dx_pos3 = target_pos3.load();
+        
+		dx_pos3 = current_pos3.load();
 		dx_pos3 += direction * step;
 		dx_pos3 = std::min(28672, std::max(dx_pos3, -28672));
 		target_pos3.store(dx_pos3);
@@ -4106,9 +4108,9 @@ namespace kaanh
 				}
 			}
 		}
-        auto cur_pos1 = target_pos1.load();
-        auto cur_pos2 = target_pos2.load();
-        auto cur_pos3 = target_pos3.load();
+        auto cur_pos1 = current_pos1.load();
+        auto cur_pos2 = current_pos1.load();
+        auto cur_pos3 = current_pos1.load();
         auto end_pos1 = int(11.378*param.joint_pos_vec[0]);
         auto end_pos2 = int(11.378*param.joint_pos_vec[1]);
         auto end_pos3 = int(11.378*param.joint_pos_vec[2]);
@@ -5784,7 +5786,7 @@ namespace kaanh
 		std::string point_name;
 		for (auto &p : params)
 		{
-            if (p.first == "p")
+            if (p.first == "name")
 			{
 				point_name = p.second;
 			}
@@ -5821,7 +5823,7 @@ namespace kaanh
 	}
 
 
-	// 多关节混合插值梯形轨迹；速度前馈 //
+	// 回零位，舵机必须处于手动模式 //
 	struct ToHomeParam
 	{
 		std::vector<Size> total_count_vec;
@@ -5835,8 +5837,16 @@ namespace kaanh
 	{
 		auto c = target.controller;
 		ToHomeParam param;
+		param.total_count_vec.clear();
+		param.axis_begin_pos_vec.clear();
+		param.axis_pos_vec.clear();
+		param.axis_vel_vec.clear();
+		param.axis_acc_vec.clear();
+		param.axis_dec_vec.clear();
+
 		param.total_count_vec.resize(7, 1);
 		param.axis_begin_pos_vec.resize(7, 0.0);
+		param.axis_pos_vec.resize(7, 0.0);
 
 		//params.at("pos")
 		for (auto &p : params)
@@ -5845,7 +5855,15 @@ namespace kaanh
 			{
 				if (p.second == "current_pos")
 				{
+					double temp[10];
 					auto pos = dynamic_cast<aris::dynamic::MatrixVariable*>(&*target.model->variablePool().findByName("homepoint"))->data();
+					std::copy(pos.begin(), pos.end(), temp);
+					param.axis_pos_vec.assign(pos.begin(), pos.begin() + 7);
+
+					target_pos1.store(temp[7] * 11.378);
+					target_pos2.store(temp[8] * 11.378);
+					target_pos3.store(temp[9] * 11.378);
+					enable_dynamixel_manual.store(1);
 				}
 				else
 				{
@@ -5862,13 +5880,13 @@ namespace kaanh
 					{
 						throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
 					}
-					for (int i = 0; i < param.axis_pos_vec.size(); i++)
-					{
-						if (i < 6)
-						{
-							param.axis_pos_vec[i] = param.axis_pos_vec[i] / 180.0*PI;
-						}
-					}
+					//for (int i = 0; i < param.axis_pos_vec.size(); i++)
+					//{
+					//	if (i < 6)
+					//	{
+					//		param.axis_pos_vec[i] = param.axis_pos_vec[i] / 180.0*PI;
+					//	}
+					//}
 				}
 			}
 			else if (p.first == "vel")
@@ -6014,7 +6032,6 @@ namespace kaanh
 			"		<Param name=\"vel\" default=\"{0.1,0.1,0.1,0.1,0.1,0.1,0.1}\" abbreviation=\"v\"/>"
 			"		<Param name=\"acc\" default=\"{0.1,0.1,0.1,0.1,0.1,0.1,0.1}\" abbreviation=\"a\"/>"
 			"		<Param name=\"dec\" default=\"{0.1,0.1,0.1,0.1,0.1,0.1,0.1}\" abbreviation=\"d\"/>"
-			"		<Param name=\"ab\" default=\"1\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -6323,6 +6340,7 @@ namespace kaanh
 		plan_root->planPool().add<kaanh::SetDriver>();
 		plan_root->planPool().add<kaanh::SaveConfig>();
         plan_root->planPool().add<kaanh::SaveHome>();
+		plan_root->planPool().add<kaanh::ToHome>();
 		plan_root->planPool().add<kaanh::SaveP>();
 		plan_root->planPool().add<kaanh::SetVel>();
 		plan_root->planPool().add<kaanh::UDVel>();

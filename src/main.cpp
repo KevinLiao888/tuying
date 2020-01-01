@@ -77,12 +77,13 @@ std::atomic_bool enable_dynamixel_home = false;		//enable_dynamixel_home——1:
 std::atomic_bool dx1_home_succsess = false, dx2_home_succsess = false, dx3_home_succsess = false;				//home_succsess——1:home_succsess
 std::atomic_int is_enabled = 2;						//is_enabled——0:disable, 1:enable, 2:NA
 std::atomic_int16_t target_pos1 = 0, target_pos2 = 0, target_pos3 = 0;
-std::atomic_int16_t current_pos1 = 0, current_pos2 = 0, current_pos3 = 0;
+std::atomic_int16_t current_pos1 = 0, current_pos2 = 0, current_pos3 = 0;	//单位是度
 std::atomic_int16_t pos1_ref = 0, pos2_ref = 0, pos3_ref = 0;			//第一次装机时位置标定值
 std::atomic_int16_t pos1_offset = 0, pos2_offset = 0, pos3_offset = 0;	//相对于第一次装机位置参数的偏置
 std::vector<std::vector<double>> dxl_pos;
 bool dxl_addparam_result = false;                 // addParam result
 bool dxl_getdata_result = false;                  // GetParam result
+
 //state code//
 std::atomic_bool dxl_connected = 0;	//0:未连接，1:连接
 std::atomic_bool dxl_enabled = 0;	//0:未使能，1:使能
@@ -376,7 +377,6 @@ int main(int argc, char *argv[])
                         break;
                     }
 
-
                     // Add parameter storage for Dynamixel#2 present position value
                     std::cout << "read2" <<std::endl;
                     dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
@@ -412,9 +412,8 @@ int main(int argc, char *argv[])
                     is_enabled.store(2);
                     enabled = true;
 					dxl_enabled.store(true);
-                }
-                // Disable //
-                else if (en == 0)
+                }       
+                else if (en == 0)// Disable //
                 {
                     if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1))return 0;
                     //if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
@@ -524,24 +523,18 @@ int main(int argc, char *argv[])
 							enable_dynamixel_home.store(false);
 						}
                     }
-                    // auto mode //
-                    else if (mode == 1)
+                    else if (mode == 1)// auto mode //
                     {
 						dxl_auto.store(true);
                         if (enable_dynamixel_auto.exchange(false))
                         {
                             static int dxl_couter;
                             dxl_couter = 0;
-
                             while(1)
                             {
-                                if(syn_clock.load() ==0)
+                                if(syn_clock.exchange(0))//syn_clock为10ms计时标记位
                                 {
-                                     std::this_thread::sleep_for(std::chrono::microseconds(500));
-                                     continue;
-                                }
-                                if(syn_clock.load()>0)
-                                {
+									//syn_clock--;//10ms计时标记位
                                     std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
 									uint8_t param_goal_position[2];
                                     bool dxl1_active = !dxl_pos[0].empty(), dxl2_active = !dxl_pos[1].empty(), dxl3_active = !dxl_pos[2].empty();
@@ -564,7 +557,7 @@ int main(int argc, char *argv[])
 									}
 									if (dxl2_active)
 									{
-										dxl_goal_position = dxl_pos[1][dxl_couter];
+										dxl_goal_position = std::int16_t(dxl_pos[1][dxl_couter]);
 										param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
 										param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
 										dxl_addparam_result = groupSyncWrite.addParam(DXL_ID2, param_goal_position);
@@ -576,7 +569,7 @@ int main(int argc, char *argv[])
 									}
 									if (dxl3_active)
 									{
-										dxl_goal_position = dxl_pos[2][dxl_couter];
+										dxl_goal_position = std::int16_t(dxl_pos[2][dxl_couter]);
 										param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
 										param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
 										dxl_addparam_result = groupSyncWrite.addParam(DXL_ID3, param_goal_position);
@@ -616,7 +609,6 @@ int main(int argc, char *argv[])
 									}
 									*/
 									
-
 									//bulkread function//
                                     dxl_comm_result = groupBulkRead.txRxPacket();
 									if (dxl1_active)
@@ -659,25 +651,27 @@ int main(int argc, char *argv[])
 										current_pos3.store(1.0*dxl3 / SCALING);
 									}
 
-
-                                    if(dxl_couter>=data_length-1) break;
-
-									syn_clock--;//10ms计时标记位
-									dxl_couter++;//emily舵机位置指向变量
                                     auto end = std::chrono::system_clock::now();
                                     auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(start2 - start1);
                                     auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end - start2);
                                     std::cout <<  "syncwrite:" << "\t" <<double(duration1.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
                                         << "\t" << "bulkread:"<< "\t" << double(duration2.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
                                                               << std::endl;
+
+									if (dxl_couter >= data_length - 1) break;
+									dxl_couter++;//emily舵机位置指向变量
                                 }
+								else
+								{
+									std::this_thread::sleep_for(std::chrono::microseconds(500));
+									continue;
+								}
                             }
                         }
                         else {}
                     }
 
                     // Read the position of dynamixel1, dynamixel2, dynamixel3 //
-
                     read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
 //                    read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
 //                    read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
@@ -687,7 +681,6 @@ int main(int argc, char *argv[])
                     current_pos1.store(1.0*dxl1 / SCALING);
                     current_pos2.store(1.0*dxl2 / SCALING);
                     current_pos3.store(1.0*dxl3 / SCALING);
-
                 }
             }
             catch (std::exception &e)
@@ -715,6 +708,7 @@ int main(int argc, char *argv[])
 	//生成kaanh.xml文档	
 
 	//-------for qifan robot begin//
+	/*
 	cs.resetController(kaanh::createControllerQifan().release());
 	cs.resetModel(kaanh::createModelQifan().release());
 	cs.resetPlanRoot(kaanh::createPlanRootRokaeXB4().release());
@@ -726,9 +720,10 @@ int main(int argc, char *argv[])
     cs.model().loadXmlFile(modelxmlpath.string().c_str());
     cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
+	*/
 	//-------for qifan robot end// 
 
-/*
+	/*
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
 	cs.resetModel(kaanh::createModelRokae().release());
@@ -740,7 +735,7 @@ int main(int argc, char *argv[])
 	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for rokae robot end// 
-*/
+	*/
 
     cs.loadXmlFile(xmlpath.string().c_str());
 
