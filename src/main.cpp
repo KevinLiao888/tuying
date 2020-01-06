@@ -382,7 +382,6 @@ int main(int argc, char *argv[])
                     dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
                     if (dxl_addparam_result != true)
                     {
-
                         fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
                         break;
                     }
@@ -473,7 +472,6 @@ int main(int argc, char *argv[])
 									break;
 								}
 
-
 								std::this_thread::sleep_for(std::chrono::milliseconds(10));
 							}
 							if (pos < DXL_MINIMUM_POSITION_VALUE)
@@ -546,6 +544,7 @@ int main(int argc, char *argv[])
 									if (dxl1_active)
 									{
                                         dxl_goal_position = std::int16_t(dxl_pos[0][dxl_couter]);
+										target_pos1.store(dxl_goal_position);
 										param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
 										param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
 										dxl_addparam_result = groupSyncWrite.addParam(DXL_ID1, param_goal_position);
@@ -558,6 +557,7 @@ int main(int argc, char *argv[])
 									if (dxl2_active)
 									{
 										dxl_goal_position = std::int16_t(dxl_pos[1][dxl_couter]);
+										target_pos2.store(dxl_goal_position);
 										param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
 										param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
 										dxl_addparam_result = groupSyncWrite.addParam(DXL_ID2, param_goal_position);
@@ -570,6 +570,7 @@ int main(int argc, char *argv[])
 									if (dxl3_active)
 									{
 										dxl_goal_position = std::int16_t(dxl_pos[2][dxl_couter]);
+										target_pos3.store(dxl_goal_position);
 										param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
 										param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
 										dxl_addparam_result = groupSyncWrite.addParam(DXL_ID3, param_goal_position);
@@ -723,7 +724,7 @@ int main(int argc, char *argv[])
 	*/
 	//-------for qifan robot end// 
 
-	/*
+	
 	//-------for rokae robot begin//
 	cs.resetController(kaanh::createControllerRokaeXB4().release());
 	cs.resetModel(kaanh::createModelRokae().release());
@@ -735,7 +736,7 @@ int main(int argc, char *argv[])
 	cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
 	cs.saveXmlFile(xmlpath.string().c_str());
 	//-------for rokae robot end// 
-	*/
+	
 
     cs.loadXmlFile(xmlpath.string().c_str());
 

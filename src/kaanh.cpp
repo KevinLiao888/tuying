@@ -468,7 +468,7 @@ namespace kaanh
 		par.motion_state.resize(7, 0);
 		std::any param = par;
 		//std::any param = std::make_any<GetParam>();
-        int motion_num = 7;
+        int motion_num = 6;
 		target.server->getRtData([&](aris::server::ControlServer& cs, const aris::plan::PlanTarget *target, std::any& data)->void
 		{
 			for (aris::Size i(-1); ++i < cs.model().partPool().size();)
@@ -3916,7 +3916,7 @@ namespace kaanh
 			}
 		}
         
-		dx_pos1 = current_pos1.load();
+		dx_pos1 = target_pos1.load();
 		dx_pos1 += direction * step;
 		dx_pos1 = std::min(28672,std::max(dx_pos1,-28672));
 		target_pos1.store(dx_pos1);
@@ -3961,7 +3961,7 @@ namespace kaanh
 			}
 		}
         
-		dx_pos2 = current_pos2.load();
+		dx_pos2 = target_pos2.load();
 		dx_pos2 += direction * step;
 		dx_pos2 = std::min(28672, std::max(dx_pos2, -28672));
 		target_pos2.store(dx_pos2);
@@ -4005,7 +4005,7 @@ namespace kaanh
 			}
 		}
         
-		dx_pos3 = current_pos3.load();
+		dx_pos3 = target_pos3.load();
 		dx_pos3 += direction * step;
 		dx_pos3 = std::min(28672, std::max(dx_pos3, -28672));
 		target_pos3.store(dx_pos3);
@@ -4109,8 +4109,8 @@ namespace kaanh
 			}
 		}
         auto cur_pos1 = current_pos1.load();
-        auto cur_pos2 = current_pos1.load();
-        auto cur_pos3 = current_pos1.load();
+        auto cur_pos2 = current_pos2.load();
+        auto cur_pos3 = current_pos3.load();
         auto end_pos1 = int(11.378*param.joint_pos_vec[0]);
         auto end_pos2 = int(11.378*param.joint_pos_vec[1]);
         auto end_pos3 = int(11.378*param.joint_pos_vec[2]);
