@@ -367,35 +367,6 @@ int main(int argc, char *argv[])
                     //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
                     //if (!enable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))return 0;
 
-                    groupBulkRead.clearParam();
-                    // Add parameter storage for Dynamixel#1 present position value
-                    std::cout << "read1" <<std::endl;
-                    dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                    if (dxl_addparam_result != true)
-                    {
-                        fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
-                        break;
-                    }
-
-                    // Add parameter storage for Dynamixel#2 present position value
-                    std::cout << "read2" <<std::endl;
-                    dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                    if (dxl_addparam_result != true)
-                    {
-                        fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
-                        break;
-                    }
-
-                    // Add parameter storage for Dynamixel#3 present position value
-                    std::cout << "read3" <<std::endl;
-                    dxl_addparam_result = groupBulkRead.addParam(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                    if (dxl_addparam_result != true)
-                    {
-
-                        fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID3);
-                        break;
-                    }
-
                     read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
                     //read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
@@ -611,6 +582,34 @@ int main(int argc, char *argv[])
 									*/
 									
 									//bulkread function//
+									// Add parameter storage for Dynamixel#1 present position value
+									std::cout << "read1" <<std::endl;
+									dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									if (dxl_addparam_result != true)
+									{
+										fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
+										break;
+									}
+
+									// Add parameter storage for Dynamixel#2 present position value
+									std::cout << "read2" <<std::endl;
+									dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									if (dxl_addparam_result != true)
+									{
+										fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
+										break;
+									}
+
+									// Add parameter storage for Dynamixel#3 present position value
+									std::cout << "read3" <<std::endl;
+									dxl_addparam_result = groupBulkRead.addParam(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									if (dxl_addparam_result != true)
+									{
+
+										fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID3);
+										break;
+									}
+										
                                     dxl_comm_result = groupBulkRead.txRxPacket();
 									if (dxl1_active)
 									{
@@ -651,7 +650,8 @@ int main(int argc, char *argv[])
 										auto dxl3 = std::int16_t(dxl_present_position3);
 										current_pos3.store(1.0*dxl3 / SCALING);
 									}
-
+									groupBulkRead.clearParam();
+									
                                     auto end = std::chrono::system_clock::now();
                                     auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(start2 - start1);
                                     auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end - start2);
@@ -707,7 +707,6 @@ int main(int argc, char *argv[])
 
 
 	//生成kaanh.xml文档	
-
 	//-------for qifan robot begin//
 	/*
 	cs.resetController(kaanh::createControllerQifan().release());

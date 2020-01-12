@@ -43,6 +43,38 @@ namespace kaanh
 		int current_plan_id = -1;
 	};
 
+	class Enable : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual executeRT(aris::plan::PlanTarget &target)->int;
+
+		virtual ~Enable();
+		explicit Enable(const std::string &name = "enable_plan");
+		ARIS_REGISTER_TYPE(Enable);
+		ARIS_DECLARE_BIG_FOUR(Enable);
+
+	private:
+		struct Imp;
+		aris::core::ImpPtr<Imp> imp_;
+	};
+
+	class Disable : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual executeRT(aris::plan::PlanTarget &target)->int;
+
+		virtual ~Disable();
+		explicit Disable(const std::string &name = "enable_plan");
+		ARIS_REGISTER_TYPE(Disable);
+		ARIS_DECLARE_BIG_FOUR(Disable);
+
+	private:
+		struct Imp;
+		aris::core::ImpPtr<Imp> imp_;
+	};
+
 	class Speed
 	{
 	public:

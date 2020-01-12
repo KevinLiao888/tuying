@@ -440,6 +440,365 @@ namespace kaanh
 		return std::move(model);
 	}
 
+#define CHECK_PARAM_STRING \
+		"		<UniqueParam default=\"check_all\">" \
+		"			<Param name=\"check_all\"/>" \
+		"			<Param name=\"check_none\"/>" \
+		"			<GroupParam>"\
+		"				<UniqueParam default=\"check_enable\">"\
+		"					<Param name=\"check_enable\"/>"\
+		"					<Param name=\"not_check_enable\"/>"\
+		"				</UniqueParam>"\
+		"				<UniqueParam default=\"check_pos\">"\
+		"					<Param name=\"check_pos\"/>"\
+		"					<Param name=\"not_check_pos\"/>"\
+		"					<GroupParam>"\
+		"						<UniqueParam default=\"check_pos_max\">"\
+		"							<Param name=\"check_pos_max\"/>"\
+		"							<Param name=\"not_check_pos_max\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_pos_min\">"\
+		"							<Param name=\"check_pos_min\"/>"\
+		"							<Param name=\"not_check_pos_min\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_pos_continuous\">"\
+		"							<Param name=\"check_pos_continuous\"/>"\
+		"							<Param name=\"not_check_pos_continuous\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_pos_continuous_second_order\">"\
+		"							<Param name=\"check_pos_continuous_second_order\"/>"\
+		"							<Param name=\"not_check_pos_continuous_second_order\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_pos_following_error\">"\
+		"							<Param name=\"check_pos_following_error\"/>"\
+		"							<Param name=\"not_check_pos_following_error\"/>"\
+		"						</UniqueParam>"\
+		"					</GroupParam>"\
+		"				</UniqueParam>"\
+		"				<UniqueParam default=\"check_vel\">"\
+		"					<Param name=\"check_vel\"/>"\
+		"					<Param name=\"not_check_vel\"/>"\
+		"					<GroupParam>"\
+		"						<UniqueParam default=\"check_vel_max\">"\
+		"							<Param name=\"check_vel_max\"/>"\
+		"							<Param name=\"not_check_vel_max\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_vel_min\">"\
+		"							<Param name=\"check_vel_min\"/>"\
+		"							<Param name=\"not_check_vel_min\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_vel_continuous\">"\
+		"							<Param name=\"check_vel_continuous\"/>"\
+		"							<Param name=\"not_check_vel_continuous\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_vel_following_error\">"\
+		"							<Param name=\"check_vel_following_error\"/>"\
+		"							<Param name=\"not_check_vel_following_error\"/>"\
+		"						</UniqueParam>"\
+		"					</GroupParam>"\
+		"				</UniqueParam>"\
+		"			</GroupParam>"\
+		"		</UniqueParam>"
+	auto set_check_option(const std::map<std::string, std::string> &cmd_params, PlanTarget &target)->void
+	{
+		for (auto cmd_param : cmd_params)
+		{
+			if (cmd_param.first == "check_all")
+			{
+				for (auto &option : target.mot_options)	option &= ~(
+					Plan::NOT_CHECK_POS_MIN |
+					Plan::NOT_CHECK_POS_MAX |
+					Plan::NOT_CHECK_POS_CONTINUOUS |
+					Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER |
+					Plan::NOT_CHECK_POS_FOLLOWING_ERROR |
+					Plan::NOT_CHECK_VEL_MIN |
+					Plan::NOT_CHECK_VEL_MAX |
+					Plan::NOT_CHECK_VEL_CONTINUOUS |
+					Plan::NOT_CHECK_VEL_FOLLOWING_ERROR);
+			}
+			else if (cmd_param.first == "check_none")
+			{
+				for (auto &option : target.mot_options)	option |=
+					Plan::NOT_CHECK_POS_MIN |
+					Plan::NOT_CHECK_POS_MAX |
+					Plan::NOT_CHECK_POS_CONTINUOUS |
+					Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER |
+					Plan::NOT_CHECK_POS_FOLLOWING_ERROR |
+					Plan::NOT_CHECK_VEL_MIN |
+					Plan::NOT_CHECK_VEL_MAX |
+					Plan::NOT_CHECK_VEL_CONTINUOUS |
+					Plan::NOT_CHECK_VEL_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "check_enable")
+			{
+				for (auto &option : target.mot_options) option &= ~(
+					Plan::NOT_CHECK_ENABLE);
+			}
+			else if (cmd_param.first == "not_check_enable")
+			{
+				for (auto &option : target.mot_options) option |=
+					Plan::NOT_CHECK_ENABLE;
+			}
+			else if (cmd_param.first == "check_pos")
+			{
+				for (auto &option : target.mot_options) option &= ~(
+					Plan::NOT_CHECK_POS_MIN |
+					Plan::NOT_CHECK_POS_MAX |
+					Plan::NOT_CHECK_POS_CONTINUOUS |
+					Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER |
+					Plan::NOT_CHECK_POS_FOLLOWING_ERROR);
+			}
+			else if (cmd_param.first == "not_check_pos")
+			{
+				for (auto &option : target.mot_options) option |=
+					Plan::NOT_CHECK_POS_MIN |
+					Plan::NOT_CHECK_POS_MAX |
+					Plan::NOT_CHECK_POS_CONTINUOUS |
+					Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER |
+					Plan::NOT_CHECK_POS_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "check_vel")
+			{
+				for (auto &option : target.mot_options) option &= ~(
+					Plan::NOT_CHECK_VEL_MIN |
+					Plan::NOT_CHECK_VEL_MAX |
+					Plan::NOT_CHECK_VEL_CONTINUOUS |
+					Plan::NOT_CHECK_VEL_FOLLOWING_ERROR);
+			}
+			else if (cmd_param.first == "not_check_vel")
+			{
+				for (auto &option : target.mot_options) option |=
+					Plan::NOT_CHECK_VEL_MIN |
+					Plan::NOT_CHECK_VEL_MAX |
+					Plan::NOT_CHECK_VEL_CONTINUOUS |
+					Plan::NOT_CHECK_VEL_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "check_pos_min")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_POS_MIN;
+			}
+			else if (cmd_param.first == "not_check_pos_min")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_POS_MIN;
+			}
+			else if (cmd_param.first == "check_pos_max")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_POS_MAX;
+			}
+			else if (cmd_param.first == "not_check_pos_max")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_POS_MAX;
+			}
+			else if (cmd_param.first == "check_pos_continuous")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_POS_CONTINUOUS;
+			}
+			else if (cmd_param.first == "not_check_pos_continuous")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_POS_CONTINUOUS;
+			}
+			else if (cmd_param.first == "check_pos_continuous_second_order")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER;
+			}
+			else if (cmd_param.first == "not_check_pos_continuous_second_order")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER;
+			}
+			else if (cmd_param.first == "check_pos_following_error")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_POS_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "not_check_pos_following_error")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_POS_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "check_vel_min")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_VEL_MIN;
+			}
+			else if (cmd_param.first == "not_check_vel_min")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_VEL_MIN;
+			}
+			else if (cmd_param.first == "check_vel_max")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_VEL_MAX;
+			}
+			else if (cmd_param.first == "not_check_vel_max")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_VEL_MAX;
+			}
+			else if (cmd_param.first == "check_vel_continuous")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_VEL_CONTINUOUS;
+			}
+			else if (cmd_param.first == "not_check_vel_continuous")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_VEL_CONTINUOUS;
+			}
+			else if (cmd_param.first == "check_vel_following_error")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_VEL_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "not_check_vel_following_error")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_VEL_FOLLOWING_ERROR;
+			}
+		}
+	}
+
+	struct SetActiveMotor { std::vector<int> active_motor; };
+#define SELECT_MOTOR_STRING \
+		"		<UniqueParam default=\"all\">"\
+		"			<Param name=\"all\" abbreviation=\"a\"/>"\
+		"			<Param name=\"motion_id\" abbreviation=\"m\" default=\"0\"/>"\
+		"			<Param name=\"physical_id\" abbreviation=\"p\" default=\"0\"/>"\
+		"			<Param name=\"slave_id\" abbreviation=\"s\" default=\"0\"/>"\
+		"		</UniqueParam>"
+	auto set_active_motor(const std::map<std::string, std::string> &cmd_params, PlanTarget &target, SetActiveMotor &param)->void
+	{
+		param.active_motor.clear();
+		param.active_motor.resize(target.controller->motionPool().size(), 0);
+
+		for (auto cmd_param : cmd_params)
+		{
+			if (cmd_param.first == "all")
+			{
+				std::fill(param.active_motor.begin(), param.active_motor.end(), 1);
+			}
+			else if (cmd_param.first == "motion_id")
+			{
+				param.active_motor.at(std::stoi(cmd_param.second)) = 1;
+			}
+			else if (cmd_param.first == "physical_id")
+			{
+				param.active_motor.at(target.controller->motionAtPhy(std::stoi(cmd_param.second)).motId()) = 1;
+			}
+			else if (cmd_param.first == "slave_id")
+			{
+				param.active_motor.at(target.controller->motionAtSla(std::stoi(cmd_param.second)).motId()) = 1;
+			}
+		}
+	}
+
+
+	struct EnableParam :public SetActiveMotor { std::int32_t limit_time; };
+	struct Enable::Imp { Imp() {} };
+	auto Enable::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		EnableParam param;
+		is_enabled.store(1);	//舵机使能
+
+		set_check_option(params, target);
+		set_active_motor(params, target, param);
+		param.limit_time = std::stoi(params.at("limit_time"));
+
+		target.param = param;
+
+		for (auto &option : target.mot_options) option |= aris::plan::Plan::NOT_CHECK_ENABLE | aris::plan::Plan::NOT_CHECK_POS_MAX | aris::plan::Plan::NOT_CHECK_POS_MIN;
+
+		std::vector<std::pair<std::string, std::any>> ret_value;
+		target.ret = ret_value;
+	}
+	auto Enable::executeRT(PlanTarget &target)->int
+	{
+		auto &param = std::any_cast<EnableParam &>(target.param);
+
+		bool is_all_finished = true;
+		for (std::size_t i = 0; i < target.controller->motionPool().size(); ++i)
+		{
+			if (param.active_motor[i])
+			{
+				auto &cm = target.controller->motionPool().at(i);
+				auto ret = cm.enable();
+				if (ret)
+				{
+					is_all_finished = false;
+
+					if (target.count % 1000 == 0)
+					{
+						target.controller->mout() << "Unenabled motor, slave id: " << cm.id()
+							<< ", absolute id: " << i << ", ret: " << ret << std::endl;
+					}
+				}
+			}
+		}
+
+		return is_all_finished ? 0 : (target.count < param.limit_time ? 1 : aris::plan::PlanTarget::PLAN_OVER_TIME);
+	}
+	Enable::~Enable() = default;
+	Enable::Enable(const std::string &name) :Plan(name), imp_(new Imp)
+	{
+		command().loadXmlStr(
+			"<Command name=\"en\">"
+			"	<GroupParam>"
+			"		<Param name=\"limit_time\" default=\"5000\"/>"
+			SELECT_MOTOR_STRING
+			CHECK_PARAM_STRING
+			"	</GroupParam>"
+			"</Command>");
+	}
+	ARIS_DEFINE_BIG_FOUR_CPP(Enable);
+
+
+	struct DisableParam :public SetActiveMotor { std::int32_t limit_time; };
+	struct Disable::Imp { Imp() {} };
+	auto Disable::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		DisableParam param;
+		is_enabled.store(0);	//舵机去使能
+
+		set_check_option(params, target);
+		set_active_motor(params, target, param);
+		param.limit_time = std::stoi(params.at("limit_time"));
+
+		target.param = param;
+		for (auto &option : target.mot_options) option |= aris::plan::Plan::NOT_CHECK_ENABLE | aris::plan::Plan::NOT_CHECK_POS_MAX | aris::plan::Plan::NOT_CHECK_POS_MIN;
+
+		std::vector<std::pair<std::string, std::any>> ret_value;
+		target.ret = ret_value;
+	}
+	auto Disable::executeRT(PlanTarget &target)->int
+	{
+		auto &param = std::any_cast<DisableParam &>(target.param);
+
+		bool is_all_finished = true;
+		for (std::size_t i = 0; i < target.controller->motionPool().size(); ++i)
+		{
+			if (param.active_motor[i])
+			{
+				auto &cm = target.controller->motionPool().at(i);
+				auto ret = cm.disable();
+				if (ret)
+				{
+					is_all_finished = false;
+
+					if (target.count % 1000 == 0)
+					{
+						target.controller->mout() << "Undisabled motor, slave id: " << cm.id()
+							<< ", absolute id: " << i << ", ret: " << ret << std::endl;
+					}
+				}
+			}
+		}
+
+		return is_all_finished ? 0 : (target.count < param.limit_time ? 1 : aris::plan::PlanTarget::PLAN_OVER_TIME);
+	}
+	Disable::~Disable() = default;
+	Disable::Disable(const std::string &name) :Plan(name), imp_(new Imp)
+	{
+		command().loadXmlStr(
+			"<Command name=\"ds\">"
+			"	<GroupParam>"
+			"		<Param name=\"limit_time\" default=\"5000\"/>"
+			SELECT_MOTOR_STRING
+			CHECK_PARAM_STRING
+			"	</GroupParam>"
+			"</Command>");
+	}
+	ARIS_DEFINE_BIG_FOUR_CPP(Disable);
+
 
 	// 获取part_pq，end_pq，end_pe等 //
 	struct GetParam
@@ -468,7 +827,7 @@ namespace kaanh
 		par.motion_state.resize(7, 0);
 		std::any param = par;
 		//std::any param = std::make_any<GetParam>();
-        int motion_num = 6;
+        int motion_num = 7;
 		target.server->getRtData([&](aris::server::ControlServer& cs, const aris::plan::PlanTarget *target, std::any& data)->void
 		{
 			for (aris::Size i(-1); ++i < cs.model().partPool().size();)
@@ -1250,6 +1609,7 @@ namespace kaanh
 		std::vector<double> axis_dec_vec;
 		std::int16_t col;
 		double ratio;
+		double percent;
 	};
 	auto MoveE0::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
@@ -1279,7 +1639,6 @@ namespace kaanh
 		//设置最大速度、加速度、减速度
 		for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
 		{
-			param.axis_vel_vec[i] = percent * c->motionPool()[i].maxVel();
 			param.axis_acc_vec[i] = percent * c->motionPool()[i].maxAcc();
 			param.axis_dec_vec[i] = percent * c->motionPool()[i].minAcc();
 		}
@@ -1437,6 +1796,14 @@ namespace kaanh
 					}
 				}	
             }
+			else if (cmd_param.first == "percent")
+			{
+				param.percent = std::stod(cmd_param.second);
+				for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+				{
+					param.axis_vel_vec[i] = param.percent * c->motionPool()[i].maxVel();
+				}
+			}
 		}
 
         std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER|Plan::NOT_CHECK_POS_CONTINUOUS);
@@ -1506,6 +1873,7 @@ namespace kaanh
 			"	<GroupParam>"
 			"		<Param name=\"col\" default=\"9\"/>"
             "		<Param name=\"path\" default=\"/home/kaanh/Desktop/emily/output.emily\"/>"
+			"		<Param name=\"percent\" default=\"0.1\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -6278,8 +6646,8 @@ namespace kaanh
 	{
         std::unique_ptr<aris::plan::PlanRoot> plan_root(new aris::plan::PlanRoot);
 
-        plan_root->planPool().add<aris::plan::Enable>();
-        plan_root->planPool().add<aris::plan::Disable>();
+        plan_root->planPool().add<kaanh::Enable>();
+        plan_root->planPool().add<kaanh::Disable>();
         plan_root->planPool().add<aris::plan::Mode>();
         plan_root->planPool().add<aris::plan::Show>();
         plan_root->planPool().add<aris::plan::Sleep>();
