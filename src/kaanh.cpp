@@ -3,6 +3,7 @@
 #include <array>
 #include <stdlib.h>
 #include <numeric>
+#include "json.hpp"
 #ifdef UNIX
 #include <sys/time.h>
 #endif // UNIX
@@ -21,6 +22,7 @@ extern std::mutex dynamixel_mutex;
 extern std::atomic_int mode_dynamixel;
 extern std::atomic_bool enable_dynamixel_auto;
 extern std::atomic_bool enable_dynamixel_manual;
+extern std::atomic_bool enable_dynamixel_home;
 extern std::atomic_int is_enabled;
 extern std::atomic_int16_t target_pos1, target_pos2, target_pos3;
 extern std::atomic_int16_t current_pos1, current_pos2, current_pos3;
@@ -51,7 +53,7 @@ namespace kaanh
 #ifdef UNIX
 			double pos_offset[6]
 			{
-                -0.438460099997905,   1.01949192131931,   -1.00835441988747,   0.0315385382644258,   0.0943992339950059,   3.4310965015334
+                -0.438460099997905,   1.01949192131931,   -1.00835441988747,   0.0315385382644258,   0.0943992339950059,   5.32826577904888
 			};
 #endif
 			double pos_factor[6]
@@ -242,7 +244,7 @@ namespace kaanh
         double max_pos = 1.29;
         double min_pos = 0;
         double max_vel = 0.5;	//0.1m/s
-        double max_acc = 2.0;	//1.0m/s2
+        double max_acc = 1.0;	//1.0m/s2
 		std::string xml_str =
 			"<EthercatMotion phy_id=\"" + std::to_string(6) + "\" product_code=\"0x6038000D\""
 			" vendor_id=\"0x0000066F\" revision_num=\"0x00010000\" dc_assign_activate=\"0x0300\""
@@ -438,6 +440,366 @@ namespace kaanh
 		return std::move(model);
 	}
 
+#define CHECK_PARAM_STRING \
+		"		<UniqueParam default=\"check_all\">" \
+		"			<Param name=\"check_all\"/>" \
+		"			<Param name=\"check_none\"/>" \
+		"			<GroupParam>"\
+		"				<UniqueParam default=\"check_enable\">"\
+		"					<Param name=\"check_enable\"/>"\
+		"					<Param name=\"not_check_enable\"/>"\
+		"				</UniqueParam>"\
+		"				<UniqueParam default=\"check_pos\">"\
+		"					<Param name=\"check_pos\"/>"\
+		"					<Param name=\"not_check_pos\"/>"\
+		"					<GroupParam>"\
+		"						<UniqueParam default=\"check_pos_max\">"\
+		"							<Param name=\"check_pos_max\"/>"\
+		"							<Param name=\"not_check_pos_max\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_pos_min\">"\
+		"							<Param name=\"check_pos_min\"/>"\
+		"							<Param name=\"not_check_pos_min\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_pos_continuous\">"\
+		"							<Param name=\"check_pos_continuous\"/>"\
+		"							<Param name=\"not_check_pos_continuous\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_pos_continuous_second_order\">"\
+		"							<Param name=\"check_pos_continuous_second_order\"/>"\
+		"							<Param name=\"not_check_pos_continuous_second_order\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_pos_following_error\">"\
+		"							<Param name=\"check_pos_following_error\"/>"\
+		"							<Param name=\"not_check_pos_following_error\"/>"\
+		"						</UniqueParam>"\
+		"					</GroupParam>"\
+		"				</UniqueParam>"\
+		"				<UniqueParam default=\"check_vel\">"\
+		"					<Param name=\"check_vel\"/>"\
+		"					<Param name=\"not_check_vel\"/>"\
+		"					<GroupParam>"\
+		"						<UniqueParam default=\"check_vel_max\">"\
+		"							<Param name=\"check_vel_max\"/>"\
+		"							<Param name=\"not_check_vel_max\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_vel_min\">"\
+		"							<Param name=\"check_vel_min\"/>"\
+		"							<Param name=\"not_check_vel_min\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_vel_continuous\">"\
+		"							<Param name=\"check_vel_continuous\"/>"\
+		"							<Param name=\"not_check_vel_continuous\"/>"\
+		"						</UniqueParam>"\
+		"						<UniqueParam default=\"check_vel_following_error\">"\
+		"							<Param name=\"check_vel_following_error\"/>"\
+		"							<Param name=\"not_check_vel_following_error\"/>"\
+		"						</UniqueParam>"\
+		"					</GroupParam>"\
+		"				</UniqueParam>"\
+		"			</GroupParam>"\
+		"		</UniqueParam>"
+	auto set_check_option(const std::map<std::string, std::string> &cmd_params, PlanTarget &target)->void
+	{
+		for (auto cmd_param : cmd_params)
+		{
+			if (cmd_param.first == "check_all")
+			{
+				for (auto &option : target.mot_options)	option &= ~(
+					Plan::NOT_CHECK_POS_MIN |
+					Plan::NOT_CHECK_POS_MAX |
+					Plan::NOT_CHECK_POS_CONTINUOUS |
+					Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER |
+					Plan::NOT_CHECK_POS_FOLLOWING_ERROR |
+					Plan::NOT_CHECK_VEL_MIN |
+					Plan::NOT_CHECK_VEL_MAX |
+					Plan::NOT_CHECK_VEL_CONTINUOUS |
+					Plan::NOT_CHECK_VEL_FOLLOWING_ERROR);
+			}
+			else if (cmd_param.first == "check_none")
+			{
+				for (auto &option : target.mot_options)	option |=
+					Plan::NOT_CHECK_POS_MIN |
+					Plan::NOT_CHECK_POS_MAX |
+					Plan::NOT_CHECK_POS_CONTINUOUS |
+					Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER |
+					Plan::NOT_CHECK_POS_FOLLOWING_ERROR |
+					Plan::NOT_CHECK_VEL_MIN |
+					Plan::NOT_CHECK_VEL_MAX |
+					Plan::NOT_CHECK_VEL_CONTINUOUS |
+					Plan::NOT_CHECK_VEL_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "check_enable")
+			{
+				for (auto &option : target.mot_options) option &= ~(
+					Plan::NOT_CHECK_ENABLE);
+			}
+			else if (cmd_param.first == "not_check_enable")
+			{
+				for (auto &option : target.mot_options) option |=
+					Plan::NOT_CHECK_ENABLE;
+			}
+			else if (cmd_param.first == "check_pos")
+			{
+				for (auto &option : target.mot_options) option &= ~(
+					Plan::NOT_CHECK_POS_MIN |
+					Plan::NOT_CHECK_POS_MAX |
+					Plan::NOT_CHECK_POS_CONTINUOUS |
+					Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER |
+					Plan::NOT_CHECK_POS_FOLLOWING_ERROR);
+			}
+			else if (cmd_param.first == "not_check_pos")
+			{
+				for (auto &option : target.mot_options) option |=
+					Plan::NOT_CHECK_POS_MIN |
+					Plan::NOT_CHECK_POS_MAX |
+					Plan::NOT_CHECK_POS_CONTINUOUS |
+					Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER |
+					Plan::NOT_CHECK_POS_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "check_vel")
+			{
+				for (auto &option : target.mot_options) option &= ~(
+					Plan::NOT_CHECK_VEL_MIN |
+					Plan::NOT_CHECK_VEL_MAX |
+					Plan::NOT_CHECK_VEL_CONTINUOUS |
+					Plan::NOT_CHECK_VEL_FOLLOWING_ERROR);
+			}
+			else if (cmd_param.first == "not_check_vel")
+			{
+				for (auto &option : target.mot_options) option |=
+					Plan::NOT_CHECK_VEL_MIN |
+					Plan::NOT_CHECK_VEL_MAX |
+					Plan::NOT_CHECK_VEL_CONTINUOUS |
+					Plan::NOT_CHECK_VEL_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "check_pos_min")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_POS_MIN;
+			}
+			else if (cmd_param.first == "not_check_pos_min")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_POS_MIN;
+			}
+			else if (cmd_param.first == "check_pos_max")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_POS_MAX;
+			}
+			else if (cmd_param.first == "not_check_pos_max")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_POS_MAX;
+			}
+			else if (cmd_param.first == "check_pos_continuous")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_POS_CONTINUOUS;
+			}
+			else if (cmd_param.first == "not_check_pos_continuous")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_POS_CONTINUOUS;
+			}
+			else if (cmd_param.first == "check_pos_continuous_second_order")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER;
+			}
+			else if (cmd_param.first == "not_check_pos_continuous_second_order")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER;
+			}
+			else if (cmd_param.first == "check_pos_following_error")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_POS_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "not_check_pos_following_error")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_POS_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "check_vel_min")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_VEL_MIN;
+			}
+			else if (cmd_param.first == "not_check_vel_min")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_VEL_MIN;
+			}
+			else if (cmd_param.first == "check_vel_max")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_VEL_MAX;
+			}
+			else if (cmd_param.first == "not_check_vel_max")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_VEL_MAX;
+			}
+			else if (cmd_param.first == "check_vel_continuous")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_VEL_CONTINUOUS;
+			}
+			else if (cmd_param.first == "not_check_vel_continuous")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_VEL_CONTINUOUS;
+			}
+			else if (cmd_param.first == "check_vel_following_error")
+			{
+				for (auto &option : target.mot_options) option &= ~Plan::NOT_CHECK_VEL_FOLLOWING_ERROR;
+			}
+			else if (cmd_param.first == "not_check_vel_following_error")
+			{
+				for (auto &option : target.mot_options) option |= Plan::NOT_CHECK_VEL_FOLLOWING_ERROR;
+			}
+		}
+	}
+
+	struct SetActiveMotor { std::vector<int> active_motor; };
+#define SELECT_MOTOR_STRING \
+		"		<UniqueParam default=\"all\">"\
+		"			<Param name=\"all\" abbreviation=\"a\"/>"\
+		"			<Param name=\"motion_id\" abbreviation=\"m\" default=\"0\"/>"\
+		"			<Param name=\"physical_id\" abbreviation=\"p\" default=\"0\"/>"\
+		"			<Param name=\"slave_id\" abbreviation=\"s\" default=\"0\"/>"\
+		"		</UniqueParam>"
+	auto set_active_motor(const std::map<std::string, std::string> &cmd_params, PlanTarget &target, SetActiveMotor &param)->void
+	{
+		param.active_motor.clear();
+		param.active_motor.resize(target.controller->motionPool().size(), 0);
+
+		for (auto cmd_param : cmd_params)
+		{
+			if (cmd_param.first == "all")
+			{
+				std::fill(param.active_motor.begin(), param.active_motor.end(), 1);
+			}
+			else if (cmd_param.first == "motion_id")
+			{
+				param.active_motor.at(std::stoi(cmd_param.second)) = 1;
+			}
+			else if (cmd_param.first == "physical_id")
+			{
+				param.active_motor.at(target.controller->motionAtPhy(std::stoi(cmd_param.second)).motId()) = 1;
+			}
+			else if (cmd_param.first == "slave_id")
+			{
+				param.active_motor.at(target.controller->motionAtSla(std::stoi(cmd_param.second)).motId()) = 1;
+			}
+		}
+	}
+
+
+	struct EnableParam :public SetActiveMotor { std::int32_t limit_time; };
+	struct Enable::Imp { Imp() {} };
+	auto Enable::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		EnableParam param;
+        is_enabled.store(1);            //舵机使能
+        std::cout << "dynamixel enabled" <<std::endl;
+
+		set_check_option(params, target);
+		set_active_motor(params, target, param);
+		param.limit_time = std::stoi(params.at("limit_time"));
+
+		target.param = param;
+        mode_dynamixel.store(0);        //manual
+		for (auto &option : target.mot_options) option |= aris::plan::Plan::NOT_CHECK_ENABLE | aris::plan::Plan::NOT_CHECK_POS_MAX | aris::plan::Plan::NOT_CHECK_POS_MIN;
+
+		std::vector<std::pair<std::string, std::any>> ret_value;
+		target.ret = ret_value;
+	}
+	auto Enable::executeRT(PlanTarget &target)->int
+	{
+		auto &param = std::any_cast<EnableParam &>(target.param);
+
+		bool is_all_finished = true;
+		for (std::size_t i = 0; i < target.controller->motionPool().size(); ++i)
+		{
+			if (param.active_motor[i])
+			{
+				auto &cm = target.controller->motionPool().at(i);
+				auto ret = cm.enable();
+				if (ret)
+				{
+					is_all_finished = false;
+
+					if (target.count % 1000 == 0)
+					{
+						target.controller->mout() << "Unenabled motor, slave id: " << cm.id()
+							<< ", absolute id: " << i << ", ret: " << ret << std::endl;
+					}
+				}
+			}
+		}
+
+		return is_all_finished ? 0 : (target.count < param.limit_time ? 1 : aris::plan::PlanTarget::PLAN_OVER_TIME);
+	}
+	Enable::~Enable() = default;
+	Enable::Enable(const std::string &name) :Plan(name), imp_(new Imp)
+	{
+		command().loadXmlStr(
+			"<Command name=\"en\">"
+			"	<GroupParam>"
+			"		<Param name=\"limit_time\" default=\"5000\"/>"
+			SELECT_MOTOR_STRING
+			CHECK_PARAM_STRING
+			"	</GroupParam>"
+			"</Command>");
+	}
+	ARIS_DEFINE_BIG_FOUR_CPP(Enable);
+
+
+	struct DisableParam :public SetActiveMotor { std::int32_t limit_time; };
+	struct Disable::Imp { Imp() {} };
+	auto Disable::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		DisableParam param;
+		is_enabled.store(0);	//舵机去使能
+
+		set_check_option(params, target);
+		set_active_motor(params, target, param);
+		param.limit_time = std::stoi(params.at("limit_time"));
+
+		target.param = param;
+		for (auto &option : target.mot_options) option |= aris::plan::Plan::NOT_CHECK_ENABLE | aris::plan::Plan::NOT_CHECK_POS_MAX | aris::plan::Plan::NOT_CHECK_POS_MIN;
+
+		std::vector<std::pair<std::string, std::any>> ret_value;
+		target.ret = ret_value;
+	}
+	auto Disable::executeRT(PlanTarget &target)->int
+	{
+		auto &param = std::any_cast<DisableParam &>(target.param);
+
+		bool is_all_finished = true;
+		for (std::size_t i = 0; i < target.controller->motionPool().size(); ++i)
+		{
+			if (param.active_motor[i])
+			{
+				auto &cm = target.controller->motionPool().at(i);
+				auto ret = cm.disable();
+				if (ret)
+				{
+					is_all_finished = false;
+
+					if (target.count % 1000 == 0)
+					{
+						target.controller->mout() << "Undisabled motor, slave id: " << cm.id()
+							<< ", absolute id: " << i << ", ret: " << ret << std::endl;
+					}
+				}
+			}
+		}
+
+		return is_all_finished ? 0 : (target.count < param.limit_time ? 1 : aris::plan::PlanTarget::PLAN_OVER_TIME);
+	}
+	Disable::~Disable() = default;
+	Disable::Disable(const std::string &name) :Plan(name), imp_(new Imp)
+	{
+		command().loadXmlStr(
+			"<Command name=\"ds\">"
+			"	<GroupParam>"
+			"		<Param name=\"limit_time\" default=\"5000\"/>"
+			SELECT_MOTOR_STRING
+			CHECK_PARAM_STRING
+			"	</GroupParam>"
+			"</Command>");
+	}
+	ARIS_DEFINE_BIG_FOUR_CPP(Disable);
+
 
 	// 获取part_pq，end_pq，end_pe等 //
 	struct GetParam
@@ -477,7 +839,7 @@ namespace kaanh
 			cs.model().generalMotionPool().at(0).getMpq(std::any_cast<GetParam &>(data).end_pq.data());
 			cs.model().generalMotionPool().at(0).getMpe(std::any_cast<GetParam &>(data).end_pe.data(), "321");
 
-			for (aris::Size i = 0; i < cs.controller().motionPool().size(); i++)
+			for (aris::Size i = 0; i < motion_num; i++)
 			{
 #ifdef WIN32
 				if (i < 6)
@@ -551,14 +913,14 @@ namespace kaanh
 		auto out_data = std::any_cast<GetParam &>(param);
 		
 		//舵机//
-        out_data.motion_pos[7] = current_pos1.load()*10;
-        out_data.motion_pos[8] = current_pos2.load()*10;
-        out_data.motion_pos[9] = current_pos3.load()*10;
+        out_data.motion_pos[7] = current_pos1.load();
+        out_data.motion_pos[8] = current_pos2.load();
+        out_data.motion_pos[9] = current_pos3.load();
         //out_data.motion_pos[7] = target_pos1.load()*10;
         //out_data.motion_pos[8] = target_pos2.load()*10;
         //out_data.motion_pos[9] = target_pos3.load()*10;
 
-		std::vector<int> slave_online(7, 0), slave_al_state(7, 0);
+        std::vector<int> slave_online(motion_num, 0), slave_al_state(motion_num, 0);
         for (aris::Size i = 0; i < motion_num; i++)
 		{
 			slave_online[i] = int(out_data.sls[i].online);
@@ -672,7 +1034,6 @@ namespace kaanh
             "<Command name=\"getp\">"
             "</Command>");
     }
-
 
 
 	// 执行emily文件 //
@@ -912,22 +1273,22 @@ namespace kaanh
 	}
 	auto MoveE::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
-		//当前有指令在执行//
+        //当前有指令在执行//
+        mode_dynamixel.store(1);
+
 		auto&cs = aris::server::ControlServer::instance();
 		std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
-        if (planptr && planptr->plan.get()->name() == this->name())
+		if (planptr && planptr->plan.get()->name() == this->name())
 		{
-			target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION | aris::plan::Plan::Option::NOT_RUN_COLLECT_FUNCTION;
+			target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
 			return;
 		}
-
 		auto c = target.controller;
 		MoveEParam param;
 		param.active.clear();
 		param.pos.clear();
 		param.target_pos.clear();
 		param.temp_pos.clear();
-		param.pos.resize(7);
 		param.target_pos.resize(7);
 		std::ifstream infile;
 
@@ -935,19 +1296,21 @@ namespace kaanh
 		{
 			if (cmd_param.first == "col")
 			{
-				param.col = std::stoi(cmd_param.second);
+                param.col = std::stoi(cmd_param.second);
 			}
-			else if (cmd_param.first == "path")
+            else if (cmd_param.first == "file")
 			{
 				std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
 				dxl_pos.clear();
 				dxl_pos.resize(3);
-				auto path = cmd_param.second;
+                auto path = "/home/kaanh/Desktop/emily/" + cmd_param.second;
 				infile.open(path);
+
 				//检查读取文件是否成功//
 				if (!infile)throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " fail to open the file");
 				//解析log文件//
 				std::string data;
+
 				while (std::getline(infile, data))
 				{
 					if (data.find("[HEADER]") != std::string::npos)
@@ -967,18 +1330,17 @@ namespace kaanh
 					}
 					if (data.find("ACTIVE_AXIS") != std::string::npos)
 					{
-                        std::string split = "=";
+						std::string split = "=";
 						// 以‘= ’为分隔符拆分字符串
 						auto axis_pos = data.find(split);
 						auto axis_string = data.substr(axis_pos + 1);
-                        std::cout << "axis_string:" << axis_string << std::endl;
+						std::cout << "axis_string:" << axis_string << std::endl;
 						std::string axis_split = ",";
 						splitString(axis_split, axis_string, param.active);
-                        for(int i=0; i< param.active.size(); i++)
-                        {
-                            std::cout << "active size:" << param.active[i] << std::endl;
-                        }
+
 						std::cout << "active size:" << param.active.size() << std::endl;
+                        param.pos.resize(param.active.size());//size of ACTIVE_AXIS
+                        std::cout << "pos size:" << param.pos.size() << std::endl;
 						continue;
 					}
 					if (data.find("[RECORDS]") != std::string::npos)
@@ -989,7 +1351,7 @@ namespace kaanh
 					{
 						break;
 					}
-					param.temp_pos.resize(std::accumulate(param.active.begin(), param.active.end(), 0) + 1);
+                    param.temp_pos.resize(param.active.size() + 1);
 					char *s_input = (char *)data.c_str();
 					const char *split = "  ";
 					// 以‘ ’为分隔符拆分字符串//
@@ -1013,113 +1375,166 @@ namespace kaanh
 				}
 
 				//数据提取//
-				int pos_count = 1, dxl_count = 0;
+                int pos_count = 1;
 				for (int k = 0; k < param.active.size(); k++)
 				{
-					if (k <= 6)
-					{
-						if (param.active[k])
-						{
-							param.pos[k].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
-							pos_count++;
-						}
-					}
-					if (k > 6)
-					{
-						if (param.active[k])
-						{
-							dxl_pos[dxl_count].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
-							pos_count++;
-						}
-						dxl_count++;
-					}
+                    if (param.active[k])
+                    {
+                        param.pos[k].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
+                        pos_count++;
+                    }
+//					if (k > 6)
+//					{
+//						if (param.active[k])
+//						{
+//							dxl_pos[dxl_count].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
+//							pos_count++;
+//						}
+//						dxl_count++;
+//					}
+//					std::cout << "duoji:" << dxl_pos[0].size() << std::endl;
 				}
 
-				//导轨数值除以1000，单位有mm换算成m
-                for(int m=0; m<param.pos[6].size(); m++)
+                //数据处理---导轨数值除以1000，单位由mm换算成m
+                if (param.active[6])
                 {
-                    param.pos[6][m] = (param.pos[6][m])/1000.0;
-                }
-
-                for(int j=0; j<dxl_pos.size();j++)
-                {
-                    if(!dxl_pos[j].empty())
+                    for (int m = 0; m < param.pos[6].size(); m++)
                     {
-                        for(int m=0; m<dxl_pos[j].size(); m++)
-                        {
-                            dxl_pos[j][m] = dxl_pos[j][m]/10.0*11.378;
-                        }
-                    }
-                    else
-                    {
-                        continue;
+                        param.pos[6][m] = (param.pos[6][m]) / 1000.0;
                     }
                 }
-
-				//对机械臂以及外部轴数据进行插值//
+                std::cout << "daogui:" << std::endl;
+				//数据处理---舵机数据单位是0.1度，除以10并乘以11.378，换算成脉冲数
+                for (int j = 7; j < param.active.size(); j++)
+				{
+                    if (param.active[j])
+					{
+                        for (int m = 0; m < param.pos[j].size(); m++)
+						{
+                            param.pos[j][m] = param.pos[j][m] / 10.0*11.378;
+						}
+					}
+					else
+					{
+						continue;
+					}
+				}
+                std::cout << "duoji:" << std::endl;
+                //数据处理--对机械臂,外部轴,duoji数据进行插值//
+                int dxl_count = 0;
 				for (int i = 0; i < param.pos.size(); i++)
 				{
-					if (!param.pos[i].empty())
-					{
-                        if(i<6)
+                    if (i < 6)
+                    {
+                        if (!param.pos[i].empty())
                         {
                             for (int j = 0; j < param.pos[i].size() - 1; j++)
                             {
-                                for (double count = param.temp_pos[0][j]; count < param.temp_pos[0][j + 1]; count = count + 0.001*param.ratio)
+                                for (double count = param.temp_pos[0][j]; count < param.temp_pos[0][j + 1] - 0.2*0.001*param.ratio; count = count + 0.001*param.ratio)
                                 {
                                     param.target_pos[i].push_back(interpolate(param.temp_pos[0][j], param.temp_pos[0][j + 1], param.pos[i][j], param.pos[i][j + 1], count)* PI / 180.0);
                                 }
                             }
                         }
-                        else
+                    }
+                    else if(i==6)
+                    {
+                        if (!param.pos[i].empty())
                         {
                             for (int j = 0; j < param.pos[i].size() - 1; j++)
                             {
-                                for (double count = param.temp_pos[0][j]; count < param.temp_pos[0][j + 1]; count = count + 0.001*param.ratio)
+                                for (double count = param.temp_pos[0][j]; count < param.temp_pos[0][j + 1] - 0.2*0.001*param.ratio; count = count + 0.001*param.ratio)
                                 {
                                     param.target_pos[i].push_back(interpolate(param.temp_pos[0][j], param.temp_pos[0][j + 1], param.pos[i][j], param.pos[i][j + 1], count));
                                 }
                             }
                         }
-
-					}
+                    }
+                    else
+                    {
+                        if (!param.pos[i].empty())
+                        {
+                            for (int j = 0; j < param.pos[i].size() - 1; j++)
+                            {
+                                for (double count = param.temp_pos[0][j]; count < param.temp_pos[0][j + 1] - 0.2*0.001*param.ratio; count = count + 0.001*param.ratio)
+                                {
+                                    dxl_pos[dxl_count].push_back(interpolate(param.temp_pos[0][j], param.temp_pos[0][j + 1], param.pos[i][j], param.pos[i][j + 1], count));
+                                }
+                            }
+                        }
+                        dxl_count++;
+                        std::cout<<"dxl_pos"<<std::endl;
+                    }
 				}
 				infile.close();
-            }
+			}
+		}
+        std::cout << "chazhi:" << std::endl;
+		//对机械臂及外部轴数据进行滑动滤波，窗口为11
+		uint16_t window = 11;
+		for (int i = 0; i < param.target_pos.size(); i++)
+		{
+			for (int j = 0; j < param.target_pos[0].size(); j++)
+			{
+				if (j < window)
+				{
+					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin(), param.target_pos[i].begin() + j + 1, 0.0) / (j + 1);
+				}
+				else
+				{
+					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin() + j - 10, param.target_pos[i].begin() + j + 1, 0.0) / window;
+				}
+			}
+		}
+		//对机械臂及外部轴数据进行滑动滤波，窗口为4
+		uint16_t window2 = 4;
+		for (int i = 0; i < param.target_pos.size(); i++)
+		{
+			for (int j = 0; j < param.target_pos[0].size(); j++)
+			{
+				if (j < window2)
+				{
+					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin(), param.target_pos[i].begin() + j + 1, 0.0) / (j + 1);
+				}
+				else
+				{
+					param.target_pos[i][j] = std::accumulate(param.target_pos[i].begin() + j - 3, param.target_pos[i].begin() + j + 1, 0.0) / window2;
+				}
+			}
 		}
 
-        for (int j = 0; j < param.target_pos.size(); j++)
+		for (int j = 0; j < param.target_pos.size(); j++)
 		{
-            for (int i = 0; i < 13; i++)
+			for (int i = 0; i < 13; i++)
 			{
 				std::cout << param.target_pos[j][i] << "  ";
 			}
 			std::cout << std::endl;
 		}
-
-        target.param = param;
-		std::vector<std::pair<std::string, std::any>> ret;
-		target.ret = ret;
-        std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER|Plan::NOT_CHECK_POS_CONTINUOUS);
+        std::cout <<"size:" << param.target_pos[0].size() << std::endl;
+		std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER | Plan::NOT_CHECK_POS_CONTINUOUS);
 		// 使能舵机emily功能 //
 		enable_dynamixel_auto.store(true);
+		target.param = param;
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
 	}
 	auto MoveE::executeRT(PlanTarget &target)->int
 	{
 		auto &param = std::any_cast<MoveEParam&>(target.param);
 		auto controller = target.controller;
 		static aris::Size total_count = 1;
-        if (target.count % 10 == 0)
-        {
-            syn_clock++;
-        }
+		if (target.count % 10 == 0)
+		{
+			syn_clock.store(1);
+		}
 
 #ifdef WIN32
 		for (int i = 0; i < target.model->motionPool().size(); i++)
 		{
 			if (!param.target_pos[i].empty())
 			{
-                target.model->motionPool().at(i).setMp(param.target_pos[i][target.count]);
+				target.model->motionPool().at(i).setMp(param.target_pos[i][target.count-1]);
 			}
 			total_count = std::max(param.target_pos[i].size(), total_count);
 		}
@@ -1149,19 +1564,18 @@ namespace kaanh
 #endif // WIN32
 
 #ifdef UNIX
-        std::cout << "3"<<std::endl;
-        std::cout << controller->motionPool().size()<<std::endl;
 		//线性插值轨迹//
 		for (int i = 0; i < controller->motionPool().size(); i++)
 		{
 			if (!param.target_pos[i].empty())
 			{
-                controller->motionPool()[i].setTargetPos(param.target_pos[i][target.count]);
+				controller->motionPool()[i].setTargetPos(param.target_pos[i][target.count-1]);
 			}
 			total_count = std::max(param.target_pos[i].size(), total_count);
 		}
-        //if (target.model->solverPool().at(1).kinPos())return -1;
+		//if (target.model->solverPool().at(1).kinPos())return -1;
 		// 打印 //
+		/*
 		auto &cout = controller->mout();
 		if (target.count % 100 == 0)
 		{
@@ -1171,7 +1585,9 @@ namespace kaanh
 			}
 			cout << std::endl;
 		}
+		*/
 		// log //
+		/*
 		auto &lout = controller->lout();
 		for (Size i = 0; i < controller->motionPool().size(); ++i)
 		{
@@ -1181,18 +1597,316 @@ namespace kaanh
 			}
 			lout << std::endl;
 		}
+		*/
 #endif // UNIX
 
 		return total_count - target.count - 1;
 	}
 	auto MoveE::collectNrt(PlanTarget &target)->void {}
+    //"		<Param name=\"path\" default=\"C:/Users/kevin/Desktop/tuying/emily/output.emily\"/>"
 	MoveE::MoveE(const std::string &name) :Plan(name)
 	{
 		command().loadXmlStr(
 			"<Command name=\"mve\">"
 			"	<GroupParam>"
+            "		<Param name=\"col\" default=\"10\"/>"
+            "		<Param name=\"file\" default=\"output.emily\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 执行emily文件 //
+	struct MoveE0Param
+	{
+		std::vector<std::vector<double>> pos;
+		std::vector<std::vector<double>> target_pos;
+		std::vector<std::vector<double>> temp_pos;
+		std::vector<bool> active;
+		std::vector<double> axis_begin_pos_vec;
+		std::vector<double> axis_vel_vec;
+		std::vector<double> axis_acc_vec;
+		std::vector<double> axis_dec_vec;
+		std::int16_t col;
+		double ratio;
+		double percent;
+	};
+	auto MoveE0::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		//当前有指令在执行//
+        mode_dynamixel.store(0);
+
+		auto&cs = aris::server::ControlServer::instance();
+		std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
+        if (planptr && planptr->plan.get()->name() == this->name())
+		{
+            target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
+			return;
+		}
+		auto c = target.controller;
+		double percent = 0.1; //速度、加速度系数
+        int16_t motor_num = 7; //电机数量
+		MoveE0Param param;
+		param.active.clear();
+		param.pos.clear();
+		param.target_pos.clear();
+		param.temp_pos.clear();
+		param.pos.resize(motor_num);
+		param.target_pos.resize(motor_num);
+		std::ifstream infile;
+		param.axis_begin_pos_vec.resize(motor_num, 0.0);
+		param.axis_vel_vec.resize(motor_num, 0.0);
+		param.axis_acc_vec.resize(motor_num, 0.0);
+		param.axis_dec_vec.resize(motor_num, 0.0);
+		//设置最大速度、加速度、减速度
+		for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+		{
+			param.axis_acc_vec[i] = percent * c->motionPool()[i].maxAcc();
+			param.axis_dec_vec[i] = percent * c->motionPool()[i].minAcc();
+		}
+
+		for (auto cmd_param : params)
+		{
+			if (cmd_param.first == "col")
+			{
+				param.col = std::stoi(cmd_param.second);
+			}
+            else if (cmd_param.first == "file")
+			{
+				std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
+				dxl_pos.clear();
+				dxl_pos.resize(3);
+                auto path = "/home/kaanh/Desktop/emily/" + cmd_param.second;
+				infile.open(path);
+
+				//检查读取文件是否成功//
+				if (!infile)throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " fail to open the file");
+				//解析log文件//
+				std::string data;
+
+				while (std::getline(infile, data))
+				{
+					if (data.find("[HEADER]") != std::string::npos)
+					{
+						continue;
+					}
+					if (data.find("GEAR_NOMINAL_VEL") != std::string::npos)
+					{
+						std::string split = "=";
+						// 以‘=’为分隔符拆分字符串
+						auto vel_pos = data.find(split);
+						auto sp_vel = data.substr(vel_pos + 1);
+						std::string vel = sp_vel;
+						param.ratio = std::stod(vel) / 1.0;
+						std::cout << "ratio:" << param.ratio << std::endl;
+						continue;
+					}
+					if (data.find("ACTIVE_AXIS") != std::string::npos)
+					{
+                        std::string split = "=";
+						// 以‘= ’为分隔符拆分字符串
+						auto axis_pos = data.find(split);
+						auto axis_string = data.substr(axis_pos + 1);
+						std::string axis_split = ",";
+						splitString(axis_split, axis_string, param.active);
+						continue;
+					}
+					if (data.find("[RECORDS]") != std::string::npos)
+					{
+						continue;
+					}
+					if (data.find("[END]") != std::string::npos)
+					{
+						break;
+					}
+                    param.temp_pos.resize(param.active.size() + 1);
+					char *s_input = (char *)data.c_str();
+					const char *split = "  ";
+					// 以‘ ’为分隔符拆分字符串//
+					char *sp_input = strtok(s_input, split);
+
+					double data_input;
+					int i = 0;
+					while (sp_input != NULL)
+					{
+						data_input = atof(sp_input);
+						param.temp_pos[i++].push_back(data_input);
+						sp_input = strtok(NULL, split);
+						continue;
+					}
+					if (s_input != NULL)
+					{
+						s_input = NULL;
+					}
+					delete(sp_input);
+					sp_input = NULL;
+					break;
+				}
+				infile.close();
+
+				//数据提取//
+				int pos_count = 1, dxl_count = 0;
+				for (int k = 0; k < param.active.size(); k++)
+				{
+					if (k <= 6)
+					{
+						if (param.active[k])
+						{
+							param.pos[k].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
+							pos_count++;
+						}
+					}
+					if (k > 6)
+					{
+						if (param.active[k])
+						{
+							dxl_pos[dxl_count].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
+							pos_count++;
+						}
+						dxl_count++;
+					}
+				}
+
+				//如果没有提取到数据，不执行程序，并返回
+				int16_t judge_flag = 0;
+				for (int k = 0; k < param.active.size(); k++)
+				{
+					judge_flag = judge_flag + param.pos[k].size();
+				}
+				if (judge_flag == 0)
+				{
+					target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
+					throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " fail to get emily data");
+					return;
+				}
+
+				//导轨数值除以1000，单位由mm换算成m
+                if(!param.pos[6].empty())
+                {
+                    param.pos[6][0] = (param.pos[6][0])/1000.0;
+                }
+				
+				//舵机数据单位是0.1度，除以10并乘以11.378，换算成脉冲数
+//                for(int j=0; j<dxl_pos.size();j++)
+//                {
+//                    if(!dxl_pos[j].empty())
+//                    {
+//                        for(int m=0; m<dxl_pos[j].size(); m++)
+//                        {
+//                            dxl_pos[j][m] = dxl_pos[j][m]/10.0*11.378;
+//                        }
+//                    }
+//                    else
+//                    {
+//                        continue;
+//                    }
+//                }
+
+                if(!dxl_pos[0].empty())
+                {
+                    target_pos1.store(dxl_pos[0][0]/10.0*11.378);
+                }
+                if(!dxl_pos[1].empty())
+                {
+                    target_pos2.store(dxl_pos[1][0]/10.0*11.378);
+                }
+                if(!dxl_pos[2].empty())
+                {
+                    target_pos3.store(dxl_pos[2][0]/10.0*11.378);
+                }
+
+				//提取机械臂以及外部轴数据第一行数据//
+				for (int i = 0; i < param.pos.size(); i++)
+				{
+					if (!param.pos[i].empty())
+					{
+                        if(i<6)
+                        {
+                            param.target_pos[i].push_back(param.pos[i][0]* PI / 180.0);
+                        }
+                        else
+                        {
+                            param.target_pos[i].push_back(param.pos[i][0]);
+                        }
+					}
+				}	
+            }
+			else if (cmd_param.first == "percent")
+			{
+				param.percent = std::stod(cmd_param.second);
+				for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+				{
+					param.axis_vel_vec[i] = param.percent * c->motionPool()[i].maxVel();
+				}
+			}
+		}
+        enable_dynamixel_manual.store(1);
+        std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER|Plan::NOT_CHECK_POS_CONTINUOUS);
+        target.param = param;
+        std::vector<std::pair<std::string, std::any>> ret;
+        target.ret = ret;
+	}
+	auto MoveE0::executeRT(PlanTarget &target)->int
+	{
+
+		auto &param = std::any_cast<MoveE0Param&>(target.param);
+		auto controller = target.controller;
+		static aris::Size total_count = 1;
+
+		// 取得起始位置 //
+		if (target.count == 1)
+		{
+            for (Size i = 0; i < controller->motionPool().size(); ++i)
+			{
+				param.axis_begin_pos_vec[i] = controller->motionPool().at(i).actualPos();
+			}
+		}
+
+#ifdef WIN32
+		for (int i = 0; i < target.model->motionPool().size(); i++)
+		{
+			double p, v, a;
+			aris::Size count = 0;
+			if (!param.target_pos[i].empty())
+			{
+				aris::plan::moveAbsolute(target.count, param.axis_begin_pos_vec[i], param.target_pos[i][0], param.axis_vel_vec[i] / 1000
+					, param.axis_acc_vec[i] / 1000 / 1000, param.axis_dec_vec[i] / 1000 / 1000, p, v, a, count);
+				target.model->motionPool().at(i).setMp(p);
+				total_count = std::max(count, total_count);
+			}
+		}
+		if (target.model->solverPool().at(1).kinPos())return -1;
+
+#endif // WIN32
+
+#ifdef UNIX
+		//线性插值轨迹//
+		for (int i = 0; i < controller->motionPool().size(); i++)
+		{
+            double p, v, a;
+            aris::Size count = 0;
+			if (!param.target_pos[i].empty())
+			{
+				aris::plan::moveAbsolute(target.count, param.axis_begin_pos_vec[i], param.target_pos[i][0], param.axis_vel_vec[i] / 1000
+					, param.axis_acc_vec[i] / 1000 / 1000, param.axis_dec_vec[i] / 1000 / 1000, p, v, a, count);
+				controller->motionPool().at(i).setTargetPos(p);
+				total_count = std::max(count, total_count);
+			}
+		}
+        if (target.model->solverPool().at(1).kinPos())return -1;
+#endif // UNIX
+
+		return total_count - target.count;
+	}
+	auto MoveE0::collectNrt(PlanTarget &target)->void {}
+    MoveE0::MoveE0(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"mve0\">"
+			"	<GroupParam>"
 			"		<Param name=\"col\" default=\"9\"/>"
-            "		<Param name=\"path\" default=\"/home/kaanh/Desktop/emily/output.emily\"/>"
+            "		<Param name=\"file\" default=\"output.emily\"/>"
+			"		<Param name=\"percent\" default=\"0.1\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -3498,6 +4212,10 @@ namespace kaanh
 			}
 		}
 
+        auto md = xbox_mode.load();
+        //duoji
+        mode_dynamixel.store(0);        //manual
+
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
 		std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
@@ -3546,7 +4264,16 @@ namespace kaanh
 	// 使能舵机 //
 	auto DEnable::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
+        //当前有指令在执行//
+        auto&cs = aris::server::ControlServer::instance();
+        std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
+        if (planptr && planptr->plan.get()->name() == this->name())
+        {
+            target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
+            return;
+        }
 		is_enabled.store(1);
+        //std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
@@ -3593,7 +4320,8 @@ namespace kaanh
 				step = 0;
 			}
 		}
-        dx_pos1 = target_pos1.load();
+        
+		dx_pos1 = target_pos1.load();
 		dx_pos1 += direction * step;
 		dx_pos1 = std::min(28672,std::max(dx_pos1,-28672));
 		target_pos1.store(dx_pos1);
@@ -3612,7 +4340,7 @@ namespace kaanh
 			"<Command name=\"dj1\">"
 			"	<UniqueParam default=\"group\">"
 			"		<GroupParam name=\"group\">"
-			"			<Param name=\"step\" default=\"2\"/>"
+            "			<Param name=\"step\" default=\"0.3\"/>"
 			"			<Param name=\"direction\" default=\"1\"/>"
 			"		</GroupParam>"
 			"		<Param name=\"stop\"/>"
@@ -3637,7 +4365,8 @@ namespace kaanh
 				step = 0;
 			}
 		}
-        dx_pos2 = target_pos2.load();
+        
+		dx_pos2 = target_pos2.load();
 		dx_pos2 += direction * step;
 		dx_pos2 = std::min(28672, std::max(dx_pos2, -28672));
 		target_pos2.store(dx_pos2);
@@ -3655,7 +4384,7 @@ namespace kaanh
 			"<Command name=\"dj2\">"
 			"	<UniqueParam default=\"group\">"
 			"		<GroupParam name=\"group\">"
-			"			<Param name=\"step\" default=\"2\"/>"
+            "			<Param name=\"step\" default=\"0.3\"/>"
 			"			<Param name=\"direction\" default=\"1\"/>"
 			"		</GroupParam>"
 			"		<Param name=\"stop\"/>"
@@ -3680,7 +4409,8 @@ namespace kaanh
 				step = 0;
 			}
 		}
-        dx_pos3 = target_pos3.load();
+        
+		dx_pos3 = target_pos3.load();
 		dx_pos3 += direction * step;
 		dx_pos3 = std::min(28672, std::max(dx_pos3, -28672));
 		target_pos3.store(dx_pos3);
@@ -3698,7 +4428,7 @@ namespace kaanh
 			"<Command name=\"dj3\">"
 			"	<UniqueParam default=\"group\">"
 			"		<GroupParam name=\"group\">"
-			"			<Param name=\"step\" default=\"2\"/>"
+            "			<Param name=\"step\" default=\"0.3\"/>"
 			"			<Param name=\"direction\" default=\"1\"/>"
 			"		</GroupParam>"
 			"		<Param name=\"stop\"/>"
@@ -3707,7 +4437,7 @@ namespace kaanh
 	}
 
 
-    // 舵机moveabsj //
+    // 舵机找home //
     struct DHomeParam
     {
         std::vector<double> joint_pos_vec;
@@ -3729,67 +4459,11 @@ namespace kaanh
                 param.joint_active_vec.resize(param.d_num, false);
                 param.joint_active_vec.at(std::stoi(cmd_param.second)) = true;
             }
-            else if (cmd_param.first == "pos")
-            {
-                aris::core::Matrix mat = target.model->calculator().calculateExpression(cmd_param.second);
-                if (mat.size() == 1)param.joint_pos_vec.resize(param.d_num, mat.toDouble());
-                else
-                {
-                    param.joint_pos_vec.resize(mat.size());
-                    std::copy(mat.begin(), mat.end(), param.joint_pos_vec.begin());
-                }
-            }
         }
-        auto cur_pos1 = target_pos1.load();
-        auto cur_pos2 = target_pos2.load();
-        auto cur_pos3 = target_pos3.load();
-        auto end_pos1 = int(11.378*param.joint_pos_vec[0]);
-        auto end_pos2 = int(11.378*param.joint_pos_vec[1]);
-        auto end_pos3 = int(11.378*param.joint_pos_vec[2]);
-
-        auto total_count = std::max(std::max(std::abs(cur_pos1-end_pos1), std::abs(cur_pos2-end_pos2)), std::abs(cur_pos3-end_pos3));
-
-        for(aris::Size i = 1; i <= total_count; i++)
-        {
-            if (param.joint_active_vec[0])
-            {
-                if(i<=std::abs(cur_pos1-end_pos1))
-                {
-                    int p1 = cur_pos1 + i*(end_pos1 - cur_pos1)/std::abs(end_pos1 - cur_pos1);
-                    p1 = std::min(28672, std::max(p1, -28672));
-                    target_pos1.store(p1);
-                }
-            }
-            if (param.joint_active_vec[1])
-            {
-                if(i<=std::abs(cur_pos2-end_pos2))
-                {
-                    int p2 = cur_pos2 + i*(end_pos2 - cur_pos2)/std::abs(end_pos2 - cur_pos2);
-                    p2 = std::min(28672, std::max(p2, -28672));
-                    target_pos2.store(p2);
-                }
-            }
-            if (param.joint_active_vec[2])
-            {
-                if(i<=std::abs(cur_pos3-end_pos3))
-                {
-                    int p3 = cur_pos3 + i*(end_pos3 - cur_pos3)/std::abs(end_pos3 - cur_pos3);
-                    p3 = std::min(28672, std::max(p3, -28672));
-                    target_pos3.store(p3);
-                }
-            }
-            enable_dynamixel_manual.store(1);
-        }
-
-
-        std::cout << "target_pos1:" << target_pos1 << std::endl;
-        std::cout << "target_pos2:" << target_pos2 << std::endl;
-        std::cout << "target_pos3:" << target_pos3 << std::endl;
-
         std::vector<std::pair<std::string, std::any>> ret;
         target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
-        //enable_dynamixel_manual.store(1);
+		enable_dynamixel_home.store(true);
     }
     auto DHome::collectNrt(PlanTarget &target)->void {}
     DHome::DHome(const std::string &name) :Plan(name)
@@ -3801,7 +4475,6 @@ namespace kaanh
             "			<Param name=\"all\" abbreviation=\"a\"/>"
             "			<Param name=\"motion_id\" abbreviation=\"m\" default=\"0\"/>"
             "		</UniqueParam>"
-            "		<Param name=\"pos\" default=\"0\"/>"
             "	</GroupParam>"
             "</Command>");
     }
@@ -3840,30 +4513,29 @@ namespace kaanh
 				}
 			}
 		}
-        auto cur_pos1 = target_pos1.load();
-        auto cur_pos2 = target_pos2.load();
-        auto cur_pos3 = target_pos3.load();
+        auto cur_pos1 = current_pos1.load();
+        auto cur_pos2 = current_pos2.load();
+        auto cur_pos3 = current_pos3.load();
         auto end_pos1 = int(11.378*param.joint_pos_vec[0]);
         auto end_pos2 = int(11.378*param.joint_pos_vec[1]);
         auto end_pos3 = int(11.378*param.joint_pos_vec[2]);
 
-
         if (param.joint_active_vec[0])
         {
-            target_pos1.store(int(11.378*param.joint_pos_vec[0]));
+            target_pos1.store(end_pos1);
         }
         if (param.joint_active_vec[1])
         {
-            target_pos2.store(int(11.378*param.joint_pos_vec[1]));
+            target_pos2.store(end_pos2);
         }
         if (param.joint_active_vec[2])
         {
-            target_pos3.store(int(11.378*param.joint_pos_vec[2]));
+            target_pos3.store(end_pos3);
         }
 			
-		std::cout << "target_pos1:" << target_pos1 << std::endl;
-		std::cout << "target_pos2:" << target_pos2 << std::endl;
-		std::cout << "target_pos3:" << target_pos3 << std::endl;
+		std::cout << "target_pos1:" << end_pos1 << std::endl;
+		std::cout << "target_pos2:" << end_pos2 << std::endl;
+		std::cout << "target_pos3:" << end_pos3 << std::endl;
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
@@ -5512,14 +6184,14 @@ namespace kaanh
 
 
 	// 保存示教点 //
-	auto SavePoint::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	auto SaveHome::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
 		auto&cs = aris::server::ControlServer::instance();
 	
 		std::string point_name;
 		for (auto &p : params)
 		{
-            if (p.first == "p")
+            if (p.first == "name")
 			{
 				point_name = p.second;
 			}
@@ -5545,12 +6217,344 @@ namespace kaanh
 		target.ret = ret;
 		target.option = aris::plan::Plan::NOT_RUN_EXECUTE_FUNCTION;
 	}
-	SavePoint::SavePoint(const std::string &name) :Plan(name)
+	SaveHome::SaveHome(const std::string &name) :Plan(name)
 	{
 		command().loadXmlStr(
-			"<Command name=\"savepoint\">"
+			"<Command name=\"savehome\">"
 			"	<GroupParam>"
             "		<Param name=\"name\" default=\"homepoint\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 回零位，舵机必须处于手动模式 //
+	struct ToHomeParam
+	{
+		std::vector<Size> total_count_vec;
+		std::vector<double> axis_begin_pos_vec;
+		std::vector<double> axis_pos_vec;
+		std::vector<double> axis_vel_vec;
+		std::vector<double> axis_acc_vec;
+		std::vector<double> axis_dec_vec;
+	};
+	auto ToHome::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		auto c = target.controller;
+		ToHomeParam param;
+		param.total_count_vec.clear();
+		param.axis_begin_pos_vec.clear();
+		param.axis_pos_vec.clear();
+		param.axis_vel_vec.clear();
+		param.axis_acc_vec.clear();
+		param.axis_dec_vec.clear();
+
+		param.total_count_vec.resize(7, 1);
+		param.axis_begin_pos_vec.resize(7, 0.0);
+		param.axis_pos_vec.resize(7, 0.0);
+
+		//params.at("pos")
+		for (auto &p : params)
+		{
+			if (p.first == "pos")
+			{
+				if (p.second == "current_pos")
+				{
+					double temp[10];
+					auto pos = dynamic_cast<aris::dynamic::MatrixVariable*>(&*target.model->variablePool().findByName("homepoint"))->data();
+					std::copy(pos.begin(), pos.end(), temp);
+					param.axis_pos_vec.assign(pos.begin(), pos.begin() + 7);
+
+					target_pos1.store(temp[7] * 11.378);
+					target_pos2.store(temp[8] * 11.378);
+					target_pos3.store(temp[9] * 11.378);
+					enable_dynamixel_manual.store(1);
+				}
+				else
+				{
+					auto pos = target.model->calculator().calculateExpression(p.second);
+					if (pos.size() == 1)
+					{
+						param.axis_pos_vec.resize(param.axis_begin_pos_vec.size(), pos.toDouble());
+					}
+					else if (pos.size() == param.axis_begin_pos_vec.size())
+					{
+						param.axis_pos_vec.assign(pos.begin(), pos.end());
+					}
+					else
+					{
+						throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
+					}
+					//for (int i = 0; i < param.axis_pos_vec.size(); i++)
+					//{
+					//	if (i < 6)
+					//	{
+					//		param.axis_pos_vec[i] = param.axis_pos_vec[i] / 180.0*PI;
+					//	}
+					//}
+				}
+			}
+			else if (p.first == "vel")
+			{
+				auto v = target.model->calculator().calculateExpression(p.second);
+				if (v.size() == 1)
+				{
+					param.axis_vel_vec.resize(param.axis_begin_pos_vec.size(), v.toDouble());
+				}
+				else if (v.size() == param.axis_begin_pos_vec.size())
+				{
+					param.axis_vel_vec.assign(v.begin(), v.end());
+				}
+				else
+				{
+					throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
+				}
+
+				for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+				{
+					//if (param.axis_vel_vec[i] > 1.0 || param.axis_vel_vec[i] < 0.01)
+					//	throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
+					if (param.axis_vel_vec[i] > 1.0)
+					{
+						param.axis_vel_vec[i] = 1.0;
+					}
+					if (param.axis_vel_vec[i] < 0.0)
+					{
+						param.axis_vel_vec[i] = 0.0;
+					}
+					param.axis_vel_vec[i] = param.axis_vel_vec[i] * c->motionPool()[i].maxVel();
+				}
+			}
+			else if (p.first == "acc")
+			{
+				auto a = target.model->calculator().calculateExpression(p.second);
+				if (a.size() == 1)
+				{
+					param.axis_acc_vec.resize(param.axis_begin_pos_vec.size(), a.toDouble());
+				}
+				else if (a.size() == param.axis_begin_pos_vec.size())
+				{
+					param.axis_acc_vec.assign(a.begin(), a.end());
+				}
+				else
+				{
+					throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
+				}
+
+				for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+				{
+					if (param.axis_acc_vec[i] > 1.0)
+					{
+						param.axis_acc_vec[i] = 1.0;
+					}
+					if (param.axis_acc_vec[i] < 0.0)
+					{
+						param.axis_acc_vec[i] = 0.0;
+					}
+					param.axis_acc_vec[i] = param.axis_acc_vec[i] * c->motionPool()[i].maxAcc();
+				}
+			}
+			else if (p.first == "dec")
+			{
+				auto d = target.model->calculator().calculateExpression(p.second);
+				if (d.size() == 1)
+				{
+					param.axis_dec_vec.resize(param.axis_begin_pos_vec.size(), d.toDouble());
+				}
+				else if (d.size() == param.axis_begin_pos_vec.size())
+				{
+					param.axis_dec_vec.assign(d.begin(), d.end());
+				}
+				else
+				{
+					throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " failed");
+				}
+
+				for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+				{
+					if (param.axis_dec_vec[i] > 1.0)
+					{
+						param.axis_dec_vec[i] = 1.0;
+					}
+					if (param.axis_dec_vec[i] < 0.0)
+					{
+						param.axis_dec_vec[i] = 0.0;
+					}
+					param.axis_dec_vec[i] = param.axis_dec_vec[i] * c->motionPool()[i].minAcc();
+				}
+			}
+		}
+		target.param = param;
+
+		//std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::USE_VEL_OFFSET);
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+
+	}
+	auto ToHome::executeRT(PlanTarget &target)->int
+	{
+		//获取驱动//
+		auto controller = target.controller;
+		auto &param = std::any_cast<ToHomeParam&>(target.param);
+		static double begin_pos[7];
+		static double pos[7];
+		// 取得起始位置 //
+		if (target.count == 1)
+		{
+			for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+			{
+				param.axis_begin_pos_vec[i] = controller->motionPool().at(i).targetPos();
+			}
+		}
+		// 设置驱动器的位置 //
+
+		for (Size i = 0; i < param.axis_begin_pos_vec.size(); ++i)
+		{
+			double p, v, a;
+			aris::plan::moveAbsolute(target.count, param.axis_begin_pos_vec[i], param.axis_pos_vec[i], param.axis_vel_vec[i] / 1000
+				, param.axis_acc_vec[i] / 1000 / 1000, param.axis_dec_vec[i] / 1000 / 1000, p, v, a, param.total_count_vec[i]);
+			controller->motionAtAbs(i).setTargetPos(p);
+		}
+		
+		if (target.model->solverPool().at(1).kinPos())return -1;
+
+		// 打印电流 //
+		auto &cout = controller->mout();
+
+		// log 电流 //
+		auto &lout = controller->lout();
+
+		return (static_cast<int>(*std::max_element(param.total_count_vec.begin(), param.total_count_vec.end())) > target.count) ? 1 : 0;
+	}
+	auto ToHome::collectNrt(PlanTarget &target)->void {}
+	ToHome::ToHome(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"tohome\">"
+			"	<GroupParam>"
+			"		<Param name=\"pos\" default=\"current_pos\"/>"
+			"		<Param name=\"vel\" default=\"{0.1,0.1,0.1,0.1,0.1,0.1,0.1}\" abbreviation=\"v\"/>"
+			"		<Param name=\"acc\" default=\"{0.1,0.1,0.1,0.1,0.1,0.1,0.1}\" abbreviation=\"a\"/>"
+			"		<Param name=\"dec\" default=\"{0.1,0.1,0.1,0.1,0.1,0.1,0.1}\" abbreviation=\"d\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 保存示教点 //
+	uint32_t p_num = 1;
+	struct SavePParam
+	{
+		bool newfile;
+	};
+	auto SaveP::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		SavePParam param;
+		std::string point_name;
+		nlohmann::json js;
+
+		for (auto &p : params)
+		{
+			if (p.first == "nf")
+			{
+				param.newfile = std::stoi(p.second);
+			}
+		}
+
+		if (param.newfile)
+		{
+			//read json file
+#ifdef UNIX
+			std::ifstream file("/home/kaanh/Desktop/emily/json/teaching.json");
+#endif // UNIX
+#ifdef WIN32
+			std::ifstream file("./json/teaching.json");
+#endif // WIN32
+			file >> js;
+            file.close();
+			time_t t = time(0);
+			tm* p = localtime(&t);
+            char filename[100] = { 0 };
+#ifdef UINX
+			sprintf(filename, "/home/kaanh/Desktop/emily/json/%d%02d%02d%02d%02d%02d.json", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
+#endif // UINX
+			
+#ifdef WIN32
+			sprintf(filename, "./json/%d%02d%02d%02d%02d%02d.json", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
+#endif // WIN32      
+            p = NULL;
+            delete (p);
+
+			//write json file
+			std::ofstream os;
+			os.open(filename);
+			os << js.dump(2) << std::endl;
+            os.close();
+
+			//new teaching.json
+			js.clear();
+			p_num = 1;
+			point_name = "p" + std::to_string(p_num);
+			auto temp_pos = save_point.load();
+			js[point_name] = temp_pos;
+
+			//write json file
+            std::ofstream os_write;
+#ifdef UINX
+			os_write.open("/home/kaanh/Desktop/emily/json/teaching.json");
+#endif // UINX
+
+#ifdef WIN32
+			os_write.open("./json/teaching.json");
+#endif // WIN32
+            
+            os_write << js.dump(2) << std::endl;
+            os_write.close();
+		}
+		else
+        {
+
+//#ifdef UINX
+			std::ifstream file("/home/kaanh/Desktop/emily/json/teaching.json");
+//#endif
+
+//#ifdef WIN32
+//			std::ifstream file("./json/teaching.json");
+//#endif // WIN32
+
+			file >> js;
+			//get new pos
+			point_name = "p" + std::to_string(++p_num);
+			auto temp_pos = save_point.load();
+			js[point_name] = temp_pos;
+			//write json file
+			std::ofstream os;
+#ifdef UINX
+			os.open("/home/kaanh/Desktop/emily/json/teaching.json");
+#endif // UINX
+
+#ifdef WIN32
+			os.open("./json/teaching.json");
+#endif // WIN32
+            
+			os << js.dump(2) << std::endl;
+			os.close();
+		}
+
+        js.clear();
+
+        std::vector<std::pair<std::string, std::any>> ret_value;
+        target.ret = ret_value;
+		target.option = aris::plan::Plan::NOT_RUN_EXECUTE_FUNCTION;
+	}
+    auto SaveP::collectNrt(PlanTarget &target)->void{}
+    SaveP::SaveP(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"savep\">"
+			"	<GroupParam>"
+			"		<Param name=\"nf\" default=\"0\"/>"
 			"	</GroupParam>"
 			"</Command>");
 	}
@@ -5679,15 +6683,15 @@ namespace kaanh
 	{
         std::unique_ptr<aris::plan::PlanRoot> plan_root(new aris::plan::PlanRoot);
 
-        plan_root->planPool().add<aris::plan::Enable>();
-        plan_root->planPool().add<aris::plan::Disable>();
+        plan_root->planPool().add<kaanh::Enable>();
+        plan_root->planPool().add<kaanh::Disable>();
         plan_root->planPool().add<aris::plan::Mode>();
         plan_root->planPool().add<aris::plan::Show>();
         plan_root->planPool().add<aris::plan::Sleep>();
         plan_root->planPool().add<aris::plan::Recover>();
         auto &rs = plan_root->planPool().add<aris::plan::Reset>();
         //for qifan robot//
-        rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5}");
+        rs.command().findParam("pos")->setDefaultValue("{0.5,0.353,0.5,0.5,0.5,0.5,0.0}");
 
         //for rokae robot//
         //rs.command().findParam("pos")->setDefaultValue("{0.5,0.3925,0.7899,0.5,0.5,0.5}");
@@ -5706,6 +6710,7 @@ namespace kaanh
 		plan_root->planPool().add<kaanh::MoveAbJ>();
 		plan_root->planPool().add<kaanh::MoveT>();
 		plan_root->planPool().add<kaanh::MoveE>();
+        plan_root->planPool().add<kaanh::MoveE0>();
 		plan_root->planPool().add<kaanh::MoveJM>();
 		plan_root->planPool().add<kaanh::MoveC>();
 		plan_root->planPool().add<kaanh::JogC>();
@@ -5739,7 +6744,9 @@ namespace kaanh
 		plan_root->planPool().add<kaanh::SetUI>();
 		plan_root->planPool().add<kaanh::SetDriver>();
 		plan_root->planPool().add<kaanh::SaveConfig>();
-        plan_root->planPool().add<kaanh::SavePoint>();
+        plan_root->planPool().add<kaanh::SaveHome>();
+		plan_root->planPool().add<kaanh::ToHome>();
+		plan_root->planPool().add<kaanh::SaveP>();
 		plan_root->planPool().add<kaanh::SetVel>();
 		plan_root->planPool().add<kaanh::UDVel>();
 		plan_root->planPool().add<kaanh::SetCT>();

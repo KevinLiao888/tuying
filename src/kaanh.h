@@ -43,6 +43,38 @@ namespace kaanh
 		int current_plan_id = -1;
 	};
 
+	class Enable : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual executeRT(aris::plan::PlanTarget &target)->int;
+
+		virtual ~Enable();
+		explicit Enable(const std::string &name = "enable_plan");
+        ARIS_REGISTER_TYPE(kaanh::Enable);
+        ARIS_DECLARE_BIG_FOUR(Enable);
+
+	private:
+		struct Imp;
+		aris::core::ImpPtr<Imp> imp_;
+	};
+
+	class Disable : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual executeRT(aris::plan::PlanTarget &target)->int;
+
+		virtual ~Disable();
+		explicit Disable(const std::string &name = "enable_plan");
+        ARIS_REGISTER_TYPE(kaanh::Disable);
+		ARIS_DECLARE_BIG_FOUR(Disable);
+
+	private:
+		struct Imp;
+		aris::core::ImpPtr<Imp> imp_;
+	};
+
 	class Speed
 	{
 	public:
@@ -73,7 +105,6 @@ namespace kaanh
 		ARIS_REGISTER_TYPE(Get);
 	};
 
-
     class Getp : public aris::plan::Plan
     {
     public:
@@ -84,7 +115,6 @@ namespace kaanh
         ARIS_REGISTER_TYPE(Getp);
     };
 
-
 	class MoveT : public aris::plan::Plan
 	{
 	public:
@@ -94,6 +124,17 @@ namespace kaanh
 
 		explicit MoveT(const std::string &name = "MoveT_plan");
 		ARIS_REGISTER_TYPE(MoveT);
+	};
+
+	class MoveE0 : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual executeRT(aris::plan::PlanTarget &target)->int;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+
+		explicit MoveE0(const std::string &name = "MoveE0_plan");
+		ARIS_REGISTER_TYPE(MoveE0);
 	};
 
 	class MoveE : public aris::plan::Plan
@@ -483,12 +524,32 @@ namespace kaanh
 		ARIS_REGISTER_TYPE(SaveConfig);
 	};
 
-	class SavePoint : public aris::plan::Plan
+	class SaveHome : public aris::plan::Plan
 	{
 	public:
 		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
-		explicit SavePoint(const std::string &name = "SavePoint_plan");
-		ARIS_REGISTER_TYPE(SavePoint);
+		explicit SaveHome(const std::string &name = "SaveHome_plan");
+		ARIS_REGISTER_TYPE(SaveHome);
+	};
+
+	class ToHome : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		auto virtual executeRT(aris::plan::PlanTarget &target)->int;
+		auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+
+		explicit ToHome(const std::string &name = "ToHome_plan");
+		ARIS_REGISTER_TYPE(ToHome);
+	};
+
+	class SaveP : public aris::plan::Plan
+	{
+	public:
+		auto virtual prepairNrt(const std::map<std::string, std::string> &params, aris::plan::PlanTarget &target)->void;
+		explicit SaveP(const std::string &name = "SaveP_plan");
+        auto virtual collectNrt(aris::plan::PlanTarget &target)->void;
+		ARIS_REGISTER_TYPE(SaveP);
 	};
 
 	class SetVel : public aris::plan::Plan
