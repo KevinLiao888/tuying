@@ -20,11 +20,12 @@ extern std::atomic_int g_vel_percent;
 extern std::atomic_int syn_clock;
 extern std::mutex dynamixel_mutex;
 extern std::atomic_int mode_dynamixel;
-extern std::atomic_bool enable_dynamixel_auto;
+extern std::atomic_bool enable_dynamixel_emily;
 extern std::atomic_bool enable_dynamixel_manual;
 extern std::atomic_bool enable_dynamixel_home;
 extern std::atomic_int is_enabled;
 extern std::atomic_int16_t target_pos1, target_pos2, target_pos3;
+extern bool dxl1_active, dxl2_active, dxl3_active;
 extern std::atomic_int16_t current_pos1, current_pos2, current_pos3;
 extern std::vector<std::vector<double>> dxl_pos;
 extern std::atomic_bool dxl_connected;	//0:未连接，1:连接
@@ -33,6 +34,7 @@ extern std::atomic_bool dxl_auto;		//0:手动，1:自动
 extern std::atomic_int dxl_normal;		//0:异常，1:正常
 std::atomic<std::array<double, 10> > save_point;
 std::atomic_int xbox_mode = 0;			//0:未指定，1:关节，2:末端，3:舵机
+extern const int dxl_timeinterval;		//舵机时间系数
 
 kaanh::CmdListParam cmdparam;
 
@@ -696,7 +698,6 @@ namespace kaanh
 		param.limit_time = std::stoi(params.at("limit_time"));
 
 		target.param = param;
-        mode_dynamixel.store(0);        //manual
 		for (auto &option : target.mot_options) option |= aris::plan::Plan::NOT_CHECK_ENABLE | aris::plan::Plan::NOT_CHECK_POS_MAX | aris::plan::Plan::NOT_CHECK_POS_MIN;
 
 		std::vector<std::pair<std::string, std::any>> ret_value;
@@ -828,7 +829,7 @@ namespace kaanh
 		par.motion_state.resize(7, 0);
 		std::any param = par;
 		//std::any param = std::make_any<GetParam>();
-        int motion_num = 7;
+        int motion_num = 6;
 		target.server->getRtData([&](aris::server::ControlServer& cs, const aris::plan::PlanTarget *target, std::any& data)->void
 		{
 			for (aris::Size i(-1); ++i < cs.model().partPool().size();)
@@ -1177,7 +1178,7 @@ namespace kaanh
 		target.ret = ret;
 
 		// 使能舵机emily功能 //
-		enable_dynamixel_auto.store(true);
+		enable_dynamixel_emily.store(true);
 	}
 	auto MoveT::executeRT(PlanTarget &target)->int
 	{
@@ -1274,8 +1275,6 @@ namespace kaanh
 	auto MoveE::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
         //当前有指令在执行//
-        mode_dynamixel.store(1);
-
 		auto&cs = aris::server::ControlServer::instance();
 		std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
 		if (planptr && planptr->plan.get()->name() == this->name())
@@ -1303,7 +1302,13 @@ namespace kaanh
 				std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
 				dxl_pos.clear();
 				dxl_pos.resize(3);
-                auto path = "/home/kaanh/Desktop/emily/" + cmd_param.second;
+#ifdef WIN32
+				auto path = "C:/Users/kevin/Desktop/tuying/emily/" + cmd_param.second;
+#endif
+#ifdef UNIX
+				auto path = "/home/kaanh/Desktop/emily/" + cmd_param.second;
+#endif
+                
 				infile.open(path);
 
 				//检查读取文件是否成功//
@@ -1325,7 +1330,7 @@ namespace kaanh
 						auto sp_vel = data.substr(vel_pos + 1);
 						std::string vel = sp_vel;
 						param.ratio = std::stod(vel) / 1.0;
-						std::cout << "ratio:" << param.ratio << std::endl;
+						std::cout << "GEAR_NOMINAL_VEL:" << param.ratio << std::endl;
 						continue;
 					}
 					if (data.find("ACTIVE_AXIS") != std::string::npos)
@@ -1334,13 +1339,13 @@ namespace kaanh
 						// 以‘= ’为分隔符拆分字符串
 						auto axis_pos = data.find(split);
 						auto axis_string = data.substr(axis_pos + 1);
-						std::cout << "axis_string:" << axis_string << std::endl;
+						std::cout << "ACTIVE_AXIS:" << axis_string << std::endl;
 						std::string axis_split = ",";
 						splitString(axis_split, axis_string, param.active);
-
-						std::cout << "active size:" << param.active.size() << std::endl;
+						dxl1_active = param.active[7];
+						dxl2_active = param.active[8];
+						dxl3_active = param.active[9];
                         param.pos.resize(param.active.size());//size of ACTIVE_AXIS
-                        std::cout << "pos size:" << param.pos.size() << std::endl;
 						continue;
 					}
 					if (data.find("[RECORDS]") != std::string::npos)
@@ -1378,21 +1383,21 @@ namespace kaanh
                 int pos_count = 1;
 				for (int k = 0; k < param.active.size(); k++)
 				{
-                    if (param.active[k])
-                    {
-                        param.pos[k].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
-                        pos_count++;
-                    }
-//					if (k > 6)
-//					{
-//						if (param.active[k])
-//						{
-//							dxl_pos[dxl_count].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
-//							pos_count++;
-//						}
-//						dxl_count++;
-//					}
-//					std::cout << "duoji:" << dxl_pos[0].size() << std::endl;
+                    param.pos[k].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
+                    pos_count++;
+				}
+
+				//如果没有提取到数据，不执行程序，并返回
+				int16_t judge_flag = 0;
+				for (int k = 0; k < param.active.size(); k++)
+				{
+					judge_flag = judge_flag + param.pos[k].size();
+				}
+				if (judge_flag == 0)
+				{
+					target.option |= aris::plan::Plan::Option::NOT_RUN_EXECUTE_FUNCTION;
+					throw std::runtime_error(__FILE__ + std::to_string(__LINE__) + " fail to get emily data");
+					return;
 				}
 
                 //数据处理---导轨数值除以1000，单位由mm换算成m
@@ -1403,7 +1408,7 @@ namespace kaanh
                         param.pos[6][m] = (param.pos[6][m]) / 1000.0;
                     }
                 }
-                std::cout << "daogui:" << std::endl;
+
 				//数据处理---舵机数据单位是0.1度，除以10并乘以11.378，换算成脉冲数
                 for (int j = 7; j < param.active.size(); j++)
 				{
@@ -1419,7 +1424,7 @@ namespace kaanh
 						continue;
 					}
 				}
-                std::cout << "duoji:" << std::endl;
+ 
                 //数据处理--对机械臂,外部轴,duoji数据进行插值//
                 int dxl_count = 0;
 				for (int i = 0; i < param.pos.size(); i++)
@@ -1463,13 +1468,11 @@ namespace kaanh
                             }
                         }
                         dxl_count++;
-                        std::cout<<"dxl_pos"<<std::endl;
                     }
 				}
 				infile.close();
 			}
 		}
-        std::cout << "chazhi:" << std::endl;
 		//对机械臂及外部轴数据进行滑动滤波，窗口为11
 		uint16_t window = 11;
 		for (int i = 0; i < param.target_pos.size(); i++)
@@ -1505,16 +1508,17 @@ namespace kaanh
 
 		for (int j = 0; j < param.target_pos.size(); j++)
 		{
+			std::cout << "前13行数据：" << std::endl;
 			for (int i = 0; i < 13; i++)
 			{
 				std::cout << param.target_pos[j][i] << "  ";
 			}
 			std::cout << std::endl;
 		}
-        std::cout <<"size:" << param.target_pos[0].size() << std::endl;
+        
 		std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER | Plan::NOT_CHECK_POS_CONTINUOUS);
 		// 使能舵机emily功能 //
-		enable_dynamixel_auto.store(true);
+		enable_dynamixel_emily.store(true);
 		target.param = param;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
@@ -1524,9 +1528,13 @@ namespace kaanh
 		auto &param = std::any_cast<MoveEParam&>(target.param);
 		auto controller = target.controller;
 		static aris::Size total_count = 1;
+		if (target.count == 1)
+		{
+			syn_clock.store(0);
+		}
 		if (target.count % 10 == 0)
 		{
-			syn_clock.store(1);
+			syn_clock++;
 		}
 
 #ifdef WIN32
@@ -1544,7 +1552,7 @@ namespace kaanh
 		auto &cout = controller->mout();
 		if (target.count % 1000 == 0)
 		{
-			for (Size i = 0; i < controller->motionPool().size(); i++)
+			for (Size i = 0; i < target.model->motionPool().size(); i++)
 			{
 				cout << target.model->motionPool().at(i).mp() << "  ";
 			}
@@ -1552,9 +1560,9 @@ namespace kaanh
 		}
 		// log //
 		auto &lout = controller->lout();
-		for (Size i = 0; i < controller->motionPool().size(); ++i)
+		for (Size i = 0; i < target.model->motionPool().size(); ++i)
 		{
-			for (Size i = 0; i < controller->motionPool().size(); i++)
+			for (Size i = 0; i < target.model->motionPool().size(); i++)
 			{
 				lout << target.model->motionPool().at(i).mp() << "  ";
 			}
@@ -1603,7 +1611,6 @@ namespace kaanh
 		return total_count - target.count - 1;
 	}
 	auto MoveE::collectNrt(PlanTarget &target)->void {}
-    //"		<Param name=\"path\" default=\"C:/Users/kevin/Desktop/tuying/emily/output.emily\"/>"
 	MoveE::MoveE(const std::string &name) :Plan(name)
 	{
 		command().loadXmlStr(
@@ -1634,8 +1641,6 @@ namespace kaanh
 	auto MoveE0::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
 		//当前有指令在执行//
-        mode_dynamixel.store(0);
-
 		auto&cs = aris::server::ControlServer::instance();
 		std::shared_ptr<aris::plan::PlanTarget> planptr = cs.currentExecuteTarget();
         if (planptr && planptr->plan.get()->name() == this->name())
@@ -1651,9 +1656,9 @@ namespace kaanh
 		param.pos.clear();
 		param.target_pos.clear();
 		param.temp_pos.clear();
-		param.pos.resize(motor_num);
 		param.target_pos.resize(motor_num);
 		std::ifstream infile;
+
 		param.axis_begin_pos_vec.resize(motor_num, 0.0);
 		param.axis_vel_vec.resize(motor_num, 0.0);
 		param.axis_acc_vec.resize(motor_num, 0.0);
@@ -1671,12 +1676,18 @@ namespace kaanh
 			{
 				param.col = std::stoi(cmd_param.second);
 			}
-            else if (cmd_param.first == "file")
+			else if (cmd_param.first == "file")
 			{
 				std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
 				dxl_pos.clear();
 				dxl_pos.resize(3);
-                auto path = "/home/kaanh/Desktop/emily/" + cmd_param.second;
+#ifdef WIN32
+				auto path = "C:/Users/kevin/Desktop/tuying/emily/" + cmd_param.second;
+#endif
+#ifdef UNIX
+				auto path = "/home/kaanh/Desktop/emily/" + cmd_param.second;
+#endif
+
 				infile.open(path);
 
 				//检查读取文件是否成功//
@@ -1698,17 +1709,19 @@ namespace kaanh
 						auto sp_vel = data.substr(vel_pos + 1);
 						std::string vel = sp_vel;
 						param.ratio = std::stod(vel) / 1.0;
-						std::cout << "ratio:" << param.ratio << std::endl;
+						std::cout << "GEAR_NOMINAL_VEL:" << param.ratio << std::endl;
 						continue;
 					}
 					if (data.find("ACTIVE_AXIS") != std::string::npos)
 					{
-                        std::string split = "=";
+						std::string split = "=";
 						// 以‘= ’为分隔符拆分字符串
 						auto axis_pos = data.find(split);
 						auto axis_string = data.substr(axis_pos + 1);
+						std::cout << "ACTIVE_AXIS:" << axis_string << std::endl;
 						std::string axis_split = ",";
 						splitString(axis_split, axis_string, param.active);
+						param.pos.resize(param.active.size());//size of ACTIVE_AXIS
 						continue;
 					}
 					if (data.find("[RECORDS]") != std::string::npos)
@@ -1719,7 +1732,7 @@ namespace kaanh
 					{
 						break;
 					}
-                    param.temp_pos.resize(param.active.size() + 1);
+					param.temp_pos.resize(param.active.size() + 1);
 					char *s_input = (char *)data.c_str();
 					const char *split = "  ";
 					// 以‘ ’为分隔符拆分字符串//
@@ -1740,31 +1753,14 @@ namespace kaanh
 					}
 					delete(sp_input);
 					sp_input = NULL;
-					break;
 				}
-				infile.close();
 
 				//数据提取//
-				int pos_count = 1, dxl_count = 0;
+				int pos_count = 1;
 				for (int k = 0; k < param.active.size(); k++)
 				{
-					if (k <= 6)
-					{
-						if (param.active[k])
-						{
-							param.pos[k].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
-							pos_count++;
-						}
-					}
-					if (k > 6)
-					{
-						if (param.active[k])
-						{
-							dxl_pos[dxl_count].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
-							pos_count++;
-						}
-						dxl_count++;
-					}
+					param.pos[k].assign(param.temp_pos[pos_count].begin(), param.temp_pos[pos_count].end());
+					pos_count++;
 				}
 
 				//如果没有提取到数据，不执行程序，并返回
@@ -1780,57 +1776,63 @@ namespace kaanh
 					return;
 				}
 
-				//导轨数值除以1000，单位由mm换算成m
-                if(!param.pos[6].empty())
-                {
-                    param.pos[6][0] = (param.pos[6][0])/1000.0;
-                }
-				
-				//舵机数据单位是0.1度，除以10并乘以11.378，换算成脉冲数
-//                for(int j=0; j<dxl_pos.size();j++)
-//                {
-//                    if(!dxl_pos[j].empty())
-//                    {
-//                        for(int m=0; m<dxl_pos[j].size(); m++)
-//                        {
-//                            dxl_pos[j][m] = dxl_pos[j][m]/10.0*11.378;
-//                        }
-//                    }
-//                    else
-//                    {
-//                        continue;
-//                    }
-//                }
+				//数据处理---导轨数值除以1000，单位由mm换算成m
+				if (param.active[6])
+				{
+					for (int m = 0; m < param.pos[6].size(); m++)
+					{
+						param.pos[6][m] = (param.pos[6][m]) / 1000.0;
+					}
+				}
 
-                if(!dxl_pos[0].empty())
-                {
-                    target_pos1.store(dxl_pos[0][0]/10.0*11.378);
-                }
-                if(!dxl_pos[1].empty())
-                {
-                    target_pos2.store(dxl_pos[1][0]/10.0*11.378);
-                }
-                if(!dxl_pos[2].empty())
-                {
-                    target_pos3.store(dxl_pos[2][0]/10.0*11.378);
-                }
+				//数据处理---舵机数据单位是0.1度，除以10并乘以11.378，换算成脉冲数
+				for (int j = 7; j < param.active.size(); j++)
+				{
+					if (param.active[j])
+					{
+						for (int m = 0; m < param.pos[j].size(); m++)
+						{
+							param.pos[j][m] = param.pos[j][m] / 10.0*11.378;
+						}
+					}
+					else
+					{
+						continue;
+					}
+				}
+
+				//提取舵机数据
+				if (!param.pos[7].empty())
+				{
+					target_pos1.store(param.pos[7][0]);
+				}
+				if (!param.pos[8].empty())
+				{
+					target_pos2.store(param.pos[8][0]);
+				}
+				if (!param.pos[9].empty())
+				{
+					target_pos3.store(param.pos[9][0]);
+				}
 
 				//提取机械臂以及外部轴数据第一行数据//
-				for (int i = 0; i < param.pos.size(); i++)
+				for (int i = 0; i < param.target_pos.size(); i++)
 				{
 					if (!param.pos[i].empty())
 					{
-                        if(i<6)
-                        {
-                            param.target_pos[i].push_back(param.pos[i][0]* PI / 180.0);
-                        }
-                        else
-                        {
-                            param.target_pos[i].push_back(param.pos[i][0]);
-                        }
+						if (i < 6)
+						{
+							param.target_pos[i].push_back(param.pos[i][0] * PI / 180.0);
+						}
+						else
+						{
+							param.target_pos[i].push_back(param.pos[i][0]);
+						}
 					}
-				}	
-            }
+				}
+				
+				infile.close();
+			}
 			else if (cmd_param.first == "percent")
 			{
 				param.percent = std::stod(cmd_param.second);
@@ -1848,7 +1850,6 @@ namespace kaanh
 	}
 	auto MoveE0::executeRT(PlanTarget &target)->int
 	{
-
 		auto &param = std::any_cast<MoveE0Param&>(target.param);
 		auto controller = target.controller;
 		static aris::Size total_count = 1;
@@ -4213,8 +4214,6 @@ namespace kaanh
 		}
 
         auto md = xbox_mode.load();
-        //duoji
-        mode_dynamixel.store(0);        //manual
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
@@ -4304,10 +4303,9 @@ namespace kaanh
 	}
 
 	// 1号舵机点动 //
-	int dx_pos1 = 0, dx_pos2 = 0, dx_pos3 = 0;
 	auto DJ1::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
-		int step = 0, direction = 0;
+		int step = 0, direction = 0, dx_pos1 = 0;
 		for (auto &p : params)
 		{
 			if (p.first == "step")
@@ -4325,13 +4323,11 @@ namespace kaanh
 		dx_pos1 += direction * step;
 		dx_pos1 = std::min(28672,std::max(dx_pos1,-28672));
 		target_pos1.store(dx_pos1);
-
-		std::cout << "dx_pos1:" << dx_pos1 << std::endl;
+		enable_dynamixel_manual.store(1);
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
-		enable_dynamixel_manual.store(1);
 	}
 	auto DJ1::collectNrt(PlanTarget &target)->void{}
 	DJ1::DJ1(const std::string &name) :Plan(name)
@@ -4352,7 +4348,7 @@ namespace kaanh
 	// 2号舵机点动 //
 	auto DJ2::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
-		int step = 0, direction = 0;
+		int step = 0, direction = 0, dx_pos2 = 0;
 		for (auto &p : params)
 		{
 			if (p.first == "step")
@@ -4370,12 +4366,11 @@ namespace kaanh
 		dx_pos2 += direction * step;
 		dx_pos2 = std::min(28672, std::max(dx_pos2, -28672));
 		target_pos2.store(dx_pos2);
+		enable_dynamixel_manual.store(1);
 
-		std::cout << "dx_pos2:" << dx_pos2 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
-		enable_dynamixel_manual.store(1);
 	}
 	auto DJ2::collectNrt(PlanTarget &target)->void {}
 	DJ2::DJ2(const std::string &name) :Plan(name)
@@ -4396,7 +4391,7 @@ namespace kaanh
 	// 3号舵机点动 //
 	auto DJ3::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
-		int step = 0, direction = 0;
+		int step = 0, direction = 0, dx_pos3 = 0;
 		for (auto &p : params)
 		{
 			if (p.first == "step")
@@ -4414,12 +4409,12 @@ namespace kaanh
 		dx_pos3 += direction * step;
 		dx_pos3 = std::min(28672, std::max(dx_pos3, -28672));
 		target_pos3.store(dx_pos3);
+		enable_dynamixel_manual.store(1);
 
-		std::cout << "dx_pos3:" << dx_pos3 << std::endl;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
-		enable_dynamixel_manual.store(1);
+		
 	}
 	auto DJ3::collectNrt(PlanTarget &target)->void {}
 	DJ3::DJ3(const std::string &name) :Plan(name)
