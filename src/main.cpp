@@ -56,10 +56,10 @@
 
 #define TORQUE_ENABLE                   1                   // Value for enabling the torque
 #define TORQUE_DISABLE                  0                   // Value for disabling the torque
-#define DXL_MINIMUM_POSITION_VALUE      -28672                 // Dynamixel will rotate between this value
-#define DXL_MAXIMUM_POSITION_VALUE      28672                // and this value (note that the Dynamixel would not move when the position value is out of movable range. Check e-manual about the range of the Dynamixel you use.)
+#define DXL_MINIMUM_POSITION_VALUE      -28672              // Dynamixel will rotate between this value
+#define DXL_MAXIMUM_POSITION_VALUE      28672               // and this value (note that the Dynamixel would not move when the position value is out of movable range. Check e-manual about the range of the Dynamixel you use.)
 #define DXL_MOVING_STATUS_THRESHOLD     10                  // Dynamixel moving status threshold
-#define ERRBIT_OVERLOAD         32      // The current load cannot be controlled by the set torque.
+#define ERRBIT_OVERLOAD         32							// The current load cannot be controlled by the set torque.
 
 #define ESC_ASCII_VALUE                 0x1b
 #define SCALING                         11.378
@@ -285,7 +285,6 @@ auto disable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHan
 std::atomic_bool is_automatic = false;
 using namespace aris::dynamic;
 //global vel//
-kaanh::Speed g_vel;
 std::atomic_int g_vel_percent = 0;
 //global vel//
 
@@ -298,7 +297,7 @@ const std::string uixmlfile = "interface_kaanh.xml";
 const std::string modelxmlfile = "model_qifan.xml";
 //const std::string modelxmlfile = "model_rokae.xml";
 
-
+//222//
 int main(int argc, char *argv[])
 {
     //指定线程cpu号
@@ -749,7 +748,6 @@ int main(int argc, char *argv[])
 
     //生成kaanh.xml文档
     //-------for qifan robot begin//
-    
     cs.resetController(kaanh::createControllerQifan().release());
     cs.resetModel(kaanh::createModelQifan().release());
     cs.resetPlanRoot(kaanh::createPlanRootRokaeXB4().release());
@@ -761,7 +759,6 @@ int main(int argc, char *argv[])
     cs.model().loadXmlFile(modelxmlpath.string().c_str());
     cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
     cs.saveXmlFile(xmlpath.string().c_str());
-    
     //-------for qifan robot end//
 
 
@@ -784,13 +781,6 @@ int main(int argc, char *argv[])
     cs.resetPlanRoot(kaanh::createPlanRootRokaeXB4().release());
     cs.saveXmlFile(xmlpath.string().c_str());
     cs.start();
-
-    //加载v100的速度值//
-    auto &getspeed = dynamic_cast<aris::dynamic::MatrixVariable &>(*cs.model().variablePool().findByName("v100"));
-    kaanh::SpeedParam speed;
-    std::copy(getspeed.data().begin(), getspeed.data().end(), &speed.w_percent);
-    speed.w_tcp = speed.w_tcp * speed.w_percent;
-    g_vel.setspeed(speed);
 
     //Start Web Socket//
     cs.open();

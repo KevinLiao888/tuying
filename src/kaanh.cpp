@@ -13,7 +13,6 @@ using namespace aris::dynamic;
 using namespace aris::plan;
 
 //global vel//
-extern kaanh::Speed g_vel;
 extern std::atomic_int g_vel_percent;
 //global vel//
 
@@ -39,7 +38,7 @@ extern const int dxl_timeinterval;		//舵机时间系数
 kaanh::CmdListParam cmdparam;
 
 namespace kaanh
-{
+{	//111//
 	auto createControllerQifan()->std::unique_ptr<aris::control::Controller>
 	{
 		std::unique_ptr<aris::control::Controller> controller(new aris::control::EthercatController);
@@ -243,7 +242,7 @@ namespace kaanh
 
         double pos_offset = -0.336;	//在零位时，为500count
 		double pos_factor = 8388608.0 * 16.07;	//电机运行一圈，导轨运行62.22mm，即导轨运行1m需要转16.07转
-        double max_pos = 1.29;
+        double max_pos = 1.51;
         double min_pos = 0;
         double max_vel = 0.5;	//0.1m/s
         double max_acc = 1.0;	//1.0m/s2
@@ -829,7 +828,7 @@ namespace kaanh
 		par.motion_state.resize(7, 0);
 		std::any param = par;
 		//std::any param = std::make_any<GetParam>();
-        int motion_num = 6;
+        int motion_num = 7;
 		target.server->getRtData([&](aris::server::ControlServer& cs, const aris::plan::PlanTarget *target, std::any& data)->void
 		{
 			for (aris::Size i(-1); ++i < cs.model().partPool().size();)
@@ -840,7 +839,7 @@ namespace kaanh
 			cs.model().generalMotionPool().at(0).getMpq(std::any_cast<GetParam &>(data).end_pq.data());
 			cs.model().generalMotionPool().at(0).getMpe(std::any_cast<GetParam &>(data).end_pe.data(), "321");
 
-			for (aris::Size i = 0; i < motion_num; i++)
+			for (aris::Size i = 0; i < cs.controller().motionPool().size(); i++)
 			{
 #ifdef WIN32
 				if (i < 6)
@@ -888,7 +887,7 @@ namespace kaanh
 
 			//获取motion的使能状态，0表示去使能状态，1表示使能状态//
 
-            for (aris::Size i = 0; i < motion_num; i++)
+            for (aris::Size i = 0; i < cs.controller().motionPool().size(); i++)
 			{
 				auto cm = dynamic_cast<aris::control::EthercatMotion*>(&cs.controller().motionPool()[i]);
 				if ((cm->statusWord() & 0x6f) != 0x27)
@@ -920,9 +919,9 @@ namespace kaanh
         //out_data.motion_pos[7] = target_pos1.load()*10;
         //out_data.motion_pos[8] = target_pos2.load()*10;
         //out_data.motion_pos[9] = target_pos3.load()*10;
-
-        std::vector<int> slave_online(motion_num, 0), slave_al_state(motion_num, 0);
-        for (aris::Size i = 0; i < motion_num; i++)
+		
+        std::vector<int> slave_online(target.controller->motionPool().size(), 0), slave_al_state(target.controller->motionPool().size(), 0);
+        for (aris::Size i = 0; i < target.controller->motionPool().size(); i++)
 		{
 			slave_online[i] = int(out_data.sls[i].online);
 			slave_al_state[i] = int(out_data.sls[i].al_state);
@@ -3308,9 +3307,9 @@ namespace kaanh
 		"	<UniqueParam>"\
 		"		<GroupParam>"\
 		"			<Param name=\"increase_count\" default=\"500\"/>"\
-		"			<Param name=\"vel\" default=\"0.5\" abbreviation=\"v\"/>"\
-		"			<Param name=\"acc\" default=\"0.5\" abbreviation=\"a\"/>"\
-		"			<Param name=\"dec\" default=\"0.5\" abbreviation=\"d\"/>"\
+		"			<Param name=\"vel\" default=\"0.1\" abbreviation=\"v\"/>"\
+		"			<Param name=\"acc\" default=\"0.1\" abbreviation=\"a\"/>"\
+		"			<Param name=\"dec\" default=\"0.1\" abbreviation=\"d\"/>"\
 		"			<Param name=\"vel_percent\" default=\"10\"/>"\
 		"			<Param name=\"direction\" default=\"1\"/>"\
 		"		</GroupParam>"\
@@ -4189,9 +4188,9 @@ namespace kaanh
 			"		<UniqueParam>"
 			"			<GroupParam>"
 			"				<Param name=\"increase_count\" default=\"500\"/>"
-			"				<Param name=\"vel\" default=\"1\" abbreviation=\"v\"/>"
-			"				<Param name=\"acc\" default=\"5\" abbreviation=\"a\"/>"
-			"				<Param name=\"dec\" default=\"5\" abbreviation=\"d\"/>"
+			"				<Param name=\"vel\" default=\"0.5\" abbreviation=\"v\"/>"
+			"				<Param name=\"acc\" default=\"0.5\" abbreviation=\"a\"/>"
+			"				<Param name=\"dec\" default=\"0.5\" abbreviation=\"d\"/>"
 			"				<Param name=\"vel_percent\" default=\"10\"/>"
 			"				<Param name=\"direction\" default=\"1\"/>"
 			"			</GroupParam>"
@@ -4557,9 +4556,9 @@ namespace kaanh
 		"	<UniqueParam>"\
 		"		<GroupParam>"\
 		"			<Param name=\"increase_count\" default=\"500\"/>"\
-		"			<Param name=\"vel\" default=\"{0.2,0.2,0.2,0.25,0.25,0.25}\"/>"\
-		"			<Param name=\"acc\" default=\"{1,1,1,1,1,1}\"/>"\
-		"			<Param name=\"dec\" default=\"{1,1,1,1,1,1}\"/>"\
+		"			<Param name=\"vel\" default=\"{0.1,0.1,0.1,0.2,0.2,0.2}\"/>"\
+		"			<Param name=\"acc\" default=\"{0.2,0.2,0.2,0.5,0.5,0.5}\"/>"\
+		"			<Param name=\"dec\" default=\"{0.2,0.2,0.2,0.5,0.5,0.5}\"/>"\
 		"			<Param name=\"cor\" default=\"0\"/>"\
 		"			<Param name=\"tool\" default=\"tool0\"/>"\
 		"			<Param name=\"wobj\" default=\"wobj0\"/>"\
