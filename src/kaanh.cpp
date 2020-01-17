@@ -28,9 +28,10 @@ extern bool dxl1_active, dxl2_active, dxl3_active;
 extern std::atomic_int16_t current_pos1, current_pos2, current_pos3;
 extern std::vector<std::vector<double>> dxl_pos;
 extern std::atomic_bool dxl_connected;	//0:未连接，1:连接
-extern std::atomic_bool dxl_enabled;	//0:未使能，1:使能
-extern std::atomic_bool dxl_auto;		//0:手动，1:自动
-extern std::atomic_int dxl_normal;		//0:异常，1:正常
+extern std::atomic_bool dxl_auto;		//0:手动运行中，1:自动运行中
+extern std::atomic_int dxl1_state;
+extern std::atomic_int dxl2_state;
+extern std::atomic_int dxl3_state;
 std::atomic<std::array<double, 10> > save_point;
 std::atomic_int xbox_mode = 0;			//0:未指定，1:关节，2:末端，3:舵机
 extern const int dxl_timeinterval;		//舵机时间系数
@@ -945,9 +946,10 @@ namespace kaanh
 		out_param.push_back(std::make_pair<std::string, std::any>("current_plan", out_data.currentplan));
 		out_param.push_back(std::make_pair<std::string, std::any>("current_plan_id", cmdparam.current_plan_id));
 		out_param.push_back(std::make_pair<std::string, std::any>("dxl_connected", dxl_connected.load()));
-		out_param.push_back(std::make_pair<std::string, std::any>("dxl_enabled", dxl_enabled.load()));
 		out_param.push_back(std::make_pair<std::string, std::any>("dxl_auto", dxl_auto.load()));
-		out_param.push_back(std::make_pair<std::string, std::any>("dxl_normal", dxl_normal.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl1_state", dxl1_state.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl1_state", dxl2_state.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl1_state", dxl3_state.load()));
 		out_param.push_back(std::make_pair<std::string, std::any>("xbox_mode", xbox_mode.load()));
 
 		std::array<double, 10> temp = { 0,0,0,0,0,0,0,0,0,0 };

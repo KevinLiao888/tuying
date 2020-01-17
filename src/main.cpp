@@ -87,9 +87,11 @@ bool dxl_getdata_result = false;                  // GetParam result
 
 //dynamixel state flag//
 std::atomic_bool dxl_connected = 0;	//0:未连接，1:连接
-std::atomic_bool dxl_enabled = 0;	//0:未使能，1:使能
-std::atomic_bool dxl_auto = 0;		//0:手动，1:自动
-std::atomic_int dxl_normal = 1;		//0:异常，1:正常--------------需要改成3个舵机的状态
+std::atomic_bool dxl_auto = 0;		//0:手动运行中，1:自动运行中
+std::atomic_int dxl1_state = 0;		//0:未使能，1:使能，2:手动运行中，3，正在执行emily，4:正在找home，5:等待命令，-1:使能失败，-2:去使能失败，-3:读位置失败，-4:写位置失败，-5:同步写失败，-6:同步读失败，-7:其他异常，-8:舵机断连接
+std::atomic_int dxl2_state = 0;
+std::atomic_int dxl3_state = 0;
+
 const int dxl_timeinterval = 10;	//舵机时间系数
 
 int getch()
@@ -141,18 +143,16 @@ int kbhit(void)
 auto enable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandler *packetHandler, int dxl_comm_result, const int dxl_id, const int baudrate)->bool
 {
     uint8_t dxl_error = 0;
-    uint16_t state = 1;
     // Set port baudrate for Dynamixel
     if (portHandler->setBaudRate(baudrate))
     {
-        state = 1;
-        std::cout << "Succeeded to change the baudrate!" << std::endl;
+        //std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
         //std::cout << "Failed to change the baudrate!" << std::endl;
-        getch();
-        state = 0;
+        //getch();
+		dxl_connected.store(0);
         return 0;
     }
     // Enable Dynamixel Torque
@@ -160,103 +160,94 @@ auto enable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHand
     if (dxl_comm_result != COMM_SUCCESS)
     {
         std::cout << packetHandler->getTxRxResult(dxl_comm_result) << std::endl;
-        state = 0;
         return 0;
     }
     else if (dxl_error != 0)
     {
         std::cout << packetHandler->getRxPacketError(dxl_error) << std::endl;
-        state = 0;
         return 0;
     }
     else
     {
-        std::cout << "Dynamixel " << dxl_id << " has been successfully connected" << std::endl;
+        //std::cout << "Dynamixel " << dxl_id << " has been successfully enabled" << std::endl;
+		return 1;
     }
-    dxl_normal.store(state);
-    return 1;
 }
 auto read_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandler *packetHandler, int dxl_comm_result, const int dxl_id, const int baudrate, uint16_t &dxl_present_position)->bool
 {
     uint8_t dxl_error = 0;
-    uint16_t state = 1;
     if (portHandler->setBaudRate(baudrate))
     {
-        state = 1;
         //std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
         //std::cout << "Failed to change the baudrate!" << std::endl;
-        getch();
-        state = 0;
+        //getch();
+		dxl_connected.store(0);
         return 0;
     }
     dxl_comm_result = packetHandler->read2ByteTxRx(portHandler, dxl_id, ADDR_MX_PRESENT_POSITION, &dxl_present_position, &dxl_error);
     if (dxl_comm_result != COMM_SUCCESS)
     {
         //printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
-        state = 0;
         return 0;
     }
     else if (dxl_error != 0)
     {
         //printf("%s\n", packetHandler->getRxPacketError(dxl_error));
-        state = 0;
         return 0;
     }
-    dxl_normal.store(state);
-    return 1;
-
+	else
+	{
+		//std::cout << "Dynamixel " << dxl_id << " has been successfully read" << std::endl;
+		return 1;
+	}
 }
 auto write_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandler *packetHandler, int dxl_comm_result, const int dxl_id, const int baudrate, int target_pos)->bool
 {
     uint8_t dxl_error = 0;
-    uint16_t state = 1;
     if (portHandler->setBaudRate(baudrate))
     {
-        state = 1;
         //std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
         //std::cout << "Failed to change the baudrate!" << std::endl;
-        getch();
-        state = 0;
+        //getch();
+		dxl_connected.store(0);
         return 0;
     }
     dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, dxl_id, ADDR_MX_GOAL_POSITION, target_pos, &dxl_error);
     if (dxl_comm_result != COMM_SUCCESS)
     {
         //printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
-        state = 0;
         return 0;
     }
     else if (dxl_error != 0)
     {
         //printf("%s\n", packetHandler->getRxPacketError(dxl_error));
-        state = 0;
         return 0;
     }
-    dxl_normal.store(state);
-    return 1;
-
+	else
+	{
+		//std::cout << "Dynamixel " << dxl_id << " has been successfully written" << std::endl;
+		return 1;
+	}
 }
 auto disable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHandler *packetHandler, int dxl_comm_result, const int dxl_id, const int baudrate)->bool
 {
     uint8_t dxl_error = 0;
-    uint16_t state = 1;
     // Set port baudrate for Dynamixel
     if (portHandler->setBaudRate(baudrate))
     {
-        state = 1;
         //std::cout << "Succeeded to change the baudrate!" << std::endl;
     }
     else
     {
         //std::cout << "Failed to change the baudrate!" << std::endl;
-        getch();
-        state = 0;
+        //getch();
+		dxl_connected.store(0);
         return 0;
     }
     // Disable Dynamixel Torque
@@ -264,21 +255,18 @@ auto disable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHan
     if (dxl_comm_result != COMM_SUCCESS)
     {
         //std::cout << packetHandler->getTxRxResult(dxl_comm_result) << std::endl;
-        state = 0;
         return 0;
     }
     else if (dxl_error != 0)
     {
         //std::cout << packetHandler->getRxPacketError(dxl_error) << std::endl;
-        state = 0;
         return 0;
     }
     else
     {
-        //std::cout << "Dynamixel " << dxl_id << " has been successfully connected" << std::endl;
+        //std::cout << "Dynamixel " << dxl_id << " has been successfully disabled" << std::endl;
+		return 1;
     }
-    dxl_normal.store(state);
-    return 1;
 }
 
 
@@ -339,394 +327,447 @@ int main(int argc, char *argv[])
         uint16_t dxl_present_position1 = 0, dxl_present_position2 = 0, dxl_present_position3 = 0;
         uint16_t dxl_present_load1 = 0, dxl_present_load2 = 0, dxl_present_load3 = 0;
 
-        // Open port //
-        if (portHandler->openPort())
-        {
-            std::cout << "Succeeded to open the port!" << std::endl;
-            dxl_connected.store(1);
-        }
-        else
-        {
-            dxl_connected.store(0);
-            std::cout << "Failed to open the port!" << std::endl;
-            std::cout << "Press any key to terminate...!" << std::endl;
-            getch();
-            return 0;
-        }
+        // Open port 每次运行程序尝试连接端口，每秒钟一次，1min连接失败，退出 //
+		start:int connecting_couter = 120;
+		while (connecting_couter > 0)
+		{
+			if (portHandler->openPort())
+			{
+				std::cout << "Succeeded to open the port!" << std::endl;
+				dxl_connected.store(1);
+				break;
+			}
+			else
+			{
+				if (connecting_couter == 1)
+				{
+					dxl_connected.store(0);
+					std::cout << "Failed to open the port!" << std::endl;
+					std::cout << "Press any key to terminate...!" << std::endl;
+					getch();
+					break;
+					//return 0;
+				}
+				std::this_thread::sleep_for(std::chrono::seconds(5));
+			}
+			connecting_couter--;
+		}
+
         while (1)
         {
             auto en = is_enabled.load();
             static bool enabled = false;
-            try
-            {
-                // Enable dynamixel1, dynamixel2, dynamixel3 //
-                if (en == 1)
-                {
-                    enable_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1);
-                    enable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2);
-                    enable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3);
+			try
+			{
+				// Enable dynamixel1, dynamixel2, dynamixel3 //
+				if (en == 1)
+				{
+					if (enable_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1))
+					{
+						dxl1_state.store(1);
+					}
+					else
+					{
+						dxl1_state.store(-1);
+					}
+					if (enable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))
+					{
+						dxl2_state.store(1);
+					}
+					else
+					{
+						dxl2_state.store(-1);
+					}
+					if (enable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))
+					{
+						dxl3_state.store(1);
+					}
+					else
+					{
+						dxl3_state.store(-1);
+					}
 
-                    read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
-                    read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
-                    read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
-                    dxl_present_position1 = std::int16_t(dxl_present_position1);
-                    dxl_present_position2 = std::int16_t(dxl_present_position2);
-                    dxl_present_position3 = std::int16_t(dxl_present_position3);
-                    std::cout << "pos1:" << dxl_present_position1 << std::endl;
-                    std::cout << "pos2:" << dxl_present_position2 << std::endl;
-                    std::cout << "pos3:" << dxl_present_position3 << std::endl;
-                    target_pos1.store(dxl_present_position1);
-                    target_pos2.store(dxl_present_position2);
-                    target_pos3.store(dxl_present_position3);
-                    is_enabled.store(2);
-                    enabled = true;
-                    dxl_enabled.store(true);
-                }
-                else if (en == 0)// Disable //
-                {
-                    if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1))return 0;
-                    if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))return 0;
-                    if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))return 0;
-                    is_enabled.store(2);
-                    enabled = false;
-                    dxl_enabled.store(false);
-                    groupBulkRead.clearParam();
-                }     
+					if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1))dxl1_state.store(-3);
+					if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2))dxl2_state.store(-3);
+					if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3))dxl3_state.store(-3);
+					dxl_present_position1 = std::int16_t(dxl_present_position1);
+					dxl_present_position2 = std::int16_t(dxl_present_position2);
+					dxl_present_position3 = std::int16_t(dxl_present_position3);
+					std::cout << "pos1:" << dxl_present_position1 << std::endl;
+					std::cout << "pos2:" << dxl_present_position2 << std::endl;
+					std::cout << "pos3:" << dxl_present_position3 << std::endl;
+					target_pos1.store(dxl_present_position1);
+					target_pos2.store(dxl_present_position2);
+					target_pos3.store(dxl_present_position3);
+					is_enabled.store(2);
+					enabled = true;
+				}
+				else if (en == 0)// Disable //
+				{
+					if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1))dxl1_state.store(-2);
+					if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2))dxl2_state.store(-2);
+					if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))dxl3_state.store(-2);
+					is_enabled.store(2);
+					enabled = false;
+				}
 				if (enabled)
-                {
-                    // manual mode //
-                    if (enable_dynamixel_manual.load())
-                    {
+				{
+					// manual mode //
+					if (enable_dynamixel_manual.load())
+					{
+						dxl1_state.store(2);
+						dxl2_state.store(2);
+						dxl3_state.store(2);
 						std::cout << "manual mode begin" << std::endl;
 						dxl_auto.store(false);
-                        auto pos1 = target_pos1.load();
-                        auto pos2 = target_pos2.load();
-                        auto pos3 = target_pos3.load();
-                        write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, pos1);
-                        write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, pos2);
-                        write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, pos3);
-                        std::cout << "manual mode end" << std::endl;
-                        enable_dynamixel_manual.store(false);
-                    }
+						auto pos1 = target_pos1.load();
+						auto pos2 = target_pos2.load();
+						auto pos3 = target_pos3.load();
+						if (!write_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, pos1))dxl1_state.store(-4);
+						if (!write_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, pos2))dxl2_state.store(-4);
+						if (!write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, pos3))dxl3_state.store(-4);
+						std::cout << "manual mode end" << std::endl;
+						enable_dynamixel_manual.store(false);
+					}
 					//homing mode//
-                    if (enable_dynamixel_home.load())
-                    {
+					if (enable_dynamixel_home.load())
+					{
+						dxl1_state.store(4);
+						dxl2_state.store(4);
+						dxl3_state.store(4);
 						std::cout << "homeing mode begin" << std::endl;
 						dxl_auto.store(true);
-                        int16_t step = 2;	//homing speed
-                        int16_t pos = 0;
-                        int16_t pos1 = current_pos1.load()*SCALING;
-                        for (int pos = pos1; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
-                        {
-                            auto dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, DXL_ID1, ADDR_MX_GOAL_POSITION, pos, &dxl_error);
-                            if (dxl_error & ERRBIT_OVERLOAD)
-                            {
-                                std::cout << "overload" << std::endl;
-                                dx1_home_succsess.store(false);
-                                break;
-                            }
-                            auto dxl_load_result = packetHandler->read2ByteTxRx(portHandler, DXL_ID1, ADDR_MX_PRESENT_LOAD, &dxl_present_load1, &dxl_error);
-                            if (dxl_load_result != COMM_SUCCESS)
-                            {
-                                printf("%s\n", packetHandler->getTxRxResult(dxl_load_result));
-                                break;
-                            }
-                            else if (dxl_error != 0)
-                            {
-                                printf("%s\n", packetHandler->getRxPacketError(dxl_error));
-                                break;
-                            }
+						int16_t step = 2;	//homing speed
+						int16_t pos = 0;
+						int16_t pos1 = current_pos1.load()*SCALING;
+						for (int pos = pos1; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
+						{
+							auto dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, DXL_ID1, ADDR_MX_GOAL_POSITION, pos, &dxl_error);
+							if (dxl_error & ERRBIT_OVERLOAD)
+							{
+								std::cout << "overload" << std::endl;
+								dx1_home_succsess.store(false);
+								break;
+							}
+							auto dxl_load_result = packetHandler->read2ByteTxRx(portHandler, DXL_ID1, ADDR_MX_PRESENT_LOAD, &dxl_present_load1, &dxl_error);
+							if (dxl_load_result != COMM_SUCCESS)
+							{
+								printf("%s\n", packetHandler->getTxRxResult(dxl_load_result));
+								break;
+							}
+							else if (dxl_error != 0)
+							{
+								printf("%s\n", packetHandler->getRxPacketError(dxl_error));
+								break;
+							}
 
-                            if (dxl_present_load1>=100)
-                            {
-                                pos1_offset = pos1_ref - pos;
-                                std::cout << "pos1:" << pos << "\t" << "pos1_offset:" << pos1_offset << "\t" << std::endl;
-                                dx1_home_succsess.store(true);
-                                break;
-                            }
+							if (dxl_present_load1 >= 100)
+							{
+								pos1_offset = pos1_ref - pos;
+								std::cout << "pos1:" << pos << "\t" << "pos1_offset:" << pos1_offset << "\t" << std::endl;
+								dx1_home_succsess.store(true);
+								break;
+							}
 
-                            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                        }
-                        if (pos < DXL_MINIMUM_POSITION_VALUE)
-                        {
-                            dx1_home_succsess.store(false);
-                            std::cout << "dx1 homing failed:" << std::endl;
-                        }
-                        /*
-                        int16_t pos2 = current_pos2.load()*SCALING;
-                        for (int pos = pos2; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
-                        {
-                            auto dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, DXL_ID2, ADDR_MX_GOAL_POSITION, pos, &dxl_error);
-                            if (dxl_error & ERRBIT_OVERLOAD)
-                            {
-                                pos2_offset = pos2_ref - pos;
-                                std::cout << "pos2:" << pos << "\t" << "pos2_offset:" << pos2_offset << "\t" << std::endl;
-                                dx2_home_succsess.store(true);
-                                break;
-                            }
-                            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                        }
-                        if (pos < DXL_MINIMUM_POSITION_VALUE)
-                        {
-                            dx2_home_succsess.store(false);
-                            std::cout << "dx2 homing failed:"<< std::endl;
-                        }
+							std::this_thread::sleep_for(std::chrono::milliseconds(10));
+						}
+						if (pos < DXL_MINIMUM_POSITION_VALUE)
+						{
+							dx1_home_succsess.store(false);
+							std::cout << "dx1 homing failed:" << std::endl;
+						}
+						/*
+						int16_t pos2 = current_pos2.load()*SCALING;
+						for (int pos = pos2; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
+						{
+							auto dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, DXL_ID2, ADDR_MX_GOAL_POSITION, pos, &dxl_error);
+							if (dxl_error & ERRBIT_OVERLOAD)
+							{
+								pos2_offset = pos2_ref - pos;
+								std::cout << "pos2:" << pos << "\t" << "pos2_offset:" << pos2_offset << "\t" << std::endl;
+								dx2_home_succsess.store(true);
+								break;
+							}
+							std::this_thread::sleep_for(std::chrono::milliseconds(10));
+						}
+						if (pos < DXL_MINIMUM_POSITION_VALUE)
+						{
+							dx2_home_succsess.store(false);
+							std::cout << "dx2 homing failed:"<< std::endl;
+						}
 
-                        int16_t pos3 = current_pos3.load()*SCALING;
-                        for (int pos = pos3; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
-                        {
-                            auto dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, DXL_ID3, ADDR_MX_GOAL_POSITION, pos, &dxl_error);
-                            if (dxl_error & ERRBIT_OVERLOAD)
-                            {
-                                pos3_offset = pos3_ref - pos;
-                                std::cout << "pos3:" << pos << "\t" << "pos3_offset:" << pos3_offset << "\t" << std::endl;
-                                dx3_home_succsess.store(true);
-                                break;
-                            }
-                            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                        }
-                        if (pos < DXL_MINIMUM_POSITION_VALUE)
-                        {
-                            dx3_home_succsess.store(false);
-                            std::cout << "dx3 homing failed:"<< std::endl;
-                        }
-                        */
-                        enable_dynamixel_home.store(false);
+						int16_t pos3 = current_pos3.load()*SCALING;
+						for (int pos = pos3; pos >= DXL_MINIMUM_POSITION_VALUE; pos -= step)
+						{
+							auto dxl_comm_result = packetHandler->write2ByteTxRx(portHandler, DXL_ID3, ADDR_MX_GOAL_POSITION, pos, &dxl_error);
+							if (dxl_error & ERRBIT_OVERLOAD)
+							{
+								pos3_offset = pos3_ref - pos;
+								std::cout << "pos3:" << pos << "\t" << "pos3_offset:" << pos3_offset << "\t" << std::endl;
+								dx3_home_succsess.store(true);
+								break;
+							}
+							std::this_thread::sleep_for(std::chrono::milliseconds(10));
+						}
+						if (pos < DXL_MINIMUM_POSITION_VALUE)
+						{
+							dx3_home_succsess.store(false);
+							std::cout << "dx3 homing failed:"<< std::endl;
+						}
+						*/
+						enable_dynamixel_home.store(false);
 						std::cout << "homeing mode end" << std::endl;
-                    }
+					}
 					//执行emily//
-                    if (enable_dynamixel_emily.load())
-                    {
+					if (enable_dynamixel_emily.load())
+					{
+						dxl1_state.store(3);
+						dxl2_state.store(3);
+						dxl3_state.store(3);
 						std::cout << "emily mode begin" << std::endl;
 						std::unique_lock<std::mutex> run_lock(dynamixel_mutex);
 						dxl_auto.store(true);
-                        int dxl_couter = 0;				
+						int dxl_couter = 0;
 						int data_length = std::max(std::max(dxl_pos[0].size(), dxl_pos[1].size()), dxl_pos[2].size());
-                        while(1)
-                        {
-                            if(syn_clock.load())//syn_clock为10ms计时标记位
-                            {
-                                syn_clock--;//10ms计时标记位     
-                                uint8_t param_goal_position[2];
+						while (1)
+						{
+							if (syn_clock.load())//syn_clock为10ms计时标记位
+							{
+								syn_clock--;//10ms计时标记位     
+								uint8_t param_goal_position[2];
 								if (dxl_couter > data_length - 1)
 								{
 									enable_dynamixel_emily.store(0);
 									syn_clock.store(0);
 									break;
 								}
-                                //syncwrite function//
-                                auto start1 = std::chrono::system_clock::now();
+								//syncwrite function//
+								auto start1 = std::chrono::system_clock::now();
 
-                                // Allocate goal position value into byte array
-                                if (dxl1_active)
-                                {
-                                    dxl_goal_position = std::int16_t(dxl_pos[0][dxl_couter]);
-                                    target_pos1.store(dxl_goal_position);
-                                    param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
-                                    param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
-                                    dxl_addparam_result = groupSyncWrite.addParam(DXL_ID1, param_goal_position);
-                                    if (dxl_addparam_result != true)
-                                    {
-										dxl_normal.store(0);
-                                        fprintf(stderr, "[ID:%03d] groupSyncWrite addparam failed", DXL_ID1);
+								// Allocate goal position value into byte array
+								if (dxl1_active)
+								{
+									dxl_goal_position = std::int16_t(dxl_pos[0][dxl_couter]);
+									target_pos1.store(dxl_goal_position);
+									param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
+									param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
+									dxl_addparam_result = groupSyncWrite.addParam(DXL_ID1, param_goal_position);
+									if (dxl_addparam_result != true)
+									{
+										dxl1_state.store(-5);
+										fprintf(stderr, "[ID:%03d] groupSyncWrite addparam failed", DXL_ID1);
 										enable_dynamixel_emily.store(0);
 										syn_clock.store(0);
-                                        break;
-                                    }
-                                }
-                                if (dxl2_active)
-                                {
-                                    dxl_goal_position = std::int16_t(dxl_pos[1][dxl_couter]);
-                                    target_pos2.store(dxl_goal_position);
-                                    param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
-                                    param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
-                                    dxl_addparam_result = groupSyncWrite.addParam(DXL_ID2, param_goal_position);
-                                    if (dxl_addparam_result != true)
-                                    {
-										dxl_normal.store(0);
-                                        fprintf(stderr, "[ID:%03d] groupSyncWrite addparam failed", DXL_ID2);
+										break;
+									}
+								}
+								if (dxl2_active)
+								{
+									dxl_goal_position = std::int16_t(dxl_pos[1][dxl_couter]);
+									target_pos2.store(dxl_goal_position);
+									param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
+									param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
+									dxl_addparam_result = groupSyncWrite.addParam(DXL_ID2, param_goal_position);
+									if (dxl_addparam_result != true)
+									{
+										dxl2_state.store(-5);
+										fprintf(stderr, "[ID:%03d] groupSyncWrite addparam failed", DXL_ID2);
 										enable_dynamixel_emily.store(0);
 										syn_clock.store(0);
-                                        break;
-                                    }
-                                }
-                                if (dxl3_active)
-                                {
-                                    dxl_goal_position = std::int16_t(dxl_pos[2][dxl_couter]);
-                                    target_pos3.store(dxl_goal_position);
-                                    param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
-                                    param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
-                                    dxl_addparam_result = groupSyncWrite.addParam(DXL_ID3, param_goal_position);
-                                    if (dxl_addparam_result != true)
-                                    {
-										dxl_normal.store(0);
-                                        fprintf(stderr, "[ID:%03d] groupSyncWrite addparam failed", DXL_ID3);
+										break;
+									}
+								}
+								if (dxl3_active)
+								{
+									dxl_goal_position = std::int16_t(dxl_pos[2][dxl_couter]);
+									target_pos3.store(dxl_goal_position);
+									param_goal_position[0] = DXL_LOBYTE(dxl_goal_position);
+									param_goal_position[1] = DXL_HIBYTE(dxl_goal_position);
+									dxl_addparam_result = groupSyncWrite.addParam(DXL_ID3, param_goal_position);
+									if (dxl_addparam_result != true)
+									{
+										dxl3_state.store(-5);
+										fprintf(stderr, "[ID:%03d] groupSyncWrite addparam failed", DXL_ID3);
 										enable_dynamixel_emily.store(0);
 										syn_clock.store(0);
-                                        break;
-                                    }
-                                }
-                                // Syncwrite goal position
-                                auto dxl_comm_result = groupSyncWrite.txPacket();
-                                if (dxl_comm_result != COMM_SUCCESS) printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
-                                // Clear syncwrite parameter storage
-                                groupSyncWrite.clearParam();
-                                auto start2 = std::chrono::system_clock::now();
+										break;
+									}
+								}
+								// Syncwrite goal position
+								auto dxl_comm_result = groupSyncWrite.txPacket();
+								if (dxl_comm_result != COMM_SUCCESS)
+								{
+									dxl1_state.store(-5);
+									dxl2_state.store(-5);
+									dxl3_state.store(-5);
+									printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
+								}
+								// Clear syncwrite parameter storage
+								groupSyncWrite.clearParam();
+								auto start2 = std::chrono::system_clock::now();
 
-                                //simpleread function//
-                                /*
-                                if (dxl1_active)
-                                {
-                                    read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
-                                    auto dxl1 = std::int16_t(dxl_present_position1);
-                                    current_pos1.store(1.0*dxl1 / SCALING);
+								//simpleread function//
+								/*
+								if (dxl1_active)
+								{
+									read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
+									auto dxl1 = std::int16_t(dxl_present_position1);
+									current_pos1.store(1.0*dxl1 / SCALING);
 
-                                }
-                                if (dxl2_active)
-                                {
-                                    read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
-                                    auto dxl2 = std::int16_t(dxl_present_position2);
-                                    current_pos2.store(1.0*dxl2 / SCALING);
-                                }
-                                if (dxl3_active)
-                                {
-                                    read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
-                                    auto dxl3 = std::int16_t(dxl_present_position3);
-                                    current_pos3.store(1.0*dxl3 / SCALING);
-                                }
-                                */
+								}
+								if (dxl2_active)
+								{
+									read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
+									auto dxl2 = std::int16_t(dxl_present_position2);
+									current_pos2.store(1.0*dxl2 / SCALING);
+								}
+								if (dxl3_active)
+								{
+									read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
+									auto dxl3 = std::int16_t(dxl_present_position3);
+									current_pos3.store(1.0*dxl3 / SCALING);
+								}
+								*/
 
-                                //bulkread function//
-                                // Add parameter storage for Dynamixel#1,Dynamixel#2,Dynamixel#3 present position value
-                                if (dxl1_active)
-                                {
-                                    //std::cout << "read1" <<std::endl;
-                                    dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                                    if (dxl_addparam_result != true)
-                                    {
-										dxl_normal.store(0);
-                                        fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
+								//bulkread function//
+								// Add parameter storage for Dynamixel#1,Dynamixel#2,Dynamixel#3 present position value
+								if (dxl1_active)
+								{
+									//std::cout << "read1" <<std::endl;
+									dxl_addparam_result = groupBulkRead.addParam(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									if (dxl_addparam_result != true)
+									{
+										dxl1_state.store(-6);
+										fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID1);
 										enable_dynamixel_emily.store(0);
 										syn_clock.store(0);
-                                        break;
-                                    }
-                                }
-                                if (dxl2_active)
-                                {
-                                    //std::cout << "read2" <<std::endl;
-                                    dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                                    if (dxl_addparam_result != true)
-                                    {
-										dxl_normal.store(0);
-                                        fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
+										break;
+									}
+								}
+								if (dxl2_active)
+								{
+									//std::cout << "read2" <<std::endl;
+									dxl_addparam_result = groupBulkRead.addParam(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									if (dxl_addparam_result != true)
+									{
+										dxl2_state.store(-6);
+										fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID2);
 										enable_dynamixel_emily.store(0);
 										syn_clock.store(0);
-                                        break;
-                                    }
-                                }
-                                if (dxl3_active)
-                                {
-                                    //std::cout << "read3" <<std::endl;
-                                    dxl_addparam_result = groupBulkRead.addParam(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                                    if (dxl_addparam_result != true)
-                                    {
-										dxl_normal.store(0);
-                                        fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID3);
+										break;
+									}
+								}
+								if (dxl3_active)
+								{
+									//std::cout << "read3" <<std::endl;
+									dxl_addparam_result = groupBulkRead.addParam(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									if (dxl_addparam_result != true)
+									{
+										dxl3_state.store(-6);
+										fprintf(stderr, "[ID:%03d] grouBulkRead addparam failed", DXL_ID3);
 										enable_dynamixel_emily.store(0);
 										syn_clock.store(0);
-                                        break;
-                                    }
-                                }
-                                
+										break;
+									}
+								}
+
 								// Read Dynamixel#1,Dynamixel#2,Dynamixel#3 present position value
 								dxl_comm_result = groupBulkRead.txRxPacket();
-                                if (dxl1_active)
-                                {
-                                    dxl_getdata_result = groupBulkRead.isAvailable(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                                    if (dxl_getdata_result != true)
-                                    {
-										dxl_normal.store(0);
-                                        fprintf(stderr, "[ID:%03d] groupBulkRead getdata failed", DXL_ID1);
+								if (dxl1_active)
+								{
+									dxl_getdata_result = groupBulkRead.isAvailable(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									if (dxl_getdata_result != true)
+									{
+										dxl1_state.store(-6);
+										fprintf(stderr, "[ID:%03d] groupBulkRead getdata failed", DXL_ID1);
 										enable_dynamixel_emily.store(0);
 										syn_clock.store(0);
-                                        break;
-                                    }
-                                    // Get Dynamixel#1 present position value
-                                    dxl_present_position1 = groupBulkRead.getData(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                                    auto dxl1 = std::int16_t(dxl_present_position1);
-                                    current_pos1.store(1.0*dxl1 / SCALING);
-                                }
-                                if (dxl2_active)
-                                {
-                                    dxl_getdata_result = groupBulkRead.isAvailable(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                                    if (dxl_getdata_result != true)
-                                    {
-										dxl_normal.store(0);
-                                        fprintf(stderr, "[ID:%03d] groupBulkRead getdata failed", DXL_ID2);
+										break;
+									}
+									// Get Dynamixel#1 present position value
+									dxl_present_position1 = groupBulkRead.getData(DXL_ID1, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									auto dxl1 = std::int16_t(dxl_present_position1);
+									current_pos1.store(1.0*dxl1 / SCALING);
+								}
+								if (dxl2_active)
+								{
+									dxl_getdata_result = groupBulkRead.isAvailable(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									if (dxl_getdata_result != true)
+									{
+										dxl2_state.store(-6);
+										fprintf(stderr, "[ID:%03d] groupBulkRead getdata failed", DXL_ID2);
 										enable_dynamixel_emily.store(0);
 										syn_clock.store(0);
-                                        break;
-                                    }
-                                    // Get Dynamixel#2 present position value
-                                    dxl_present_position2 = groupBulkRead.getData(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                                    auto dxl2 = std::int16_t(dxl_present_position2);
-                                    current_pos2.store(1.0*dxl2 / SCALING);
-                                }
-                                if (dxl3_active)
-                                {
-                                    dxl_getdata_result = groupBulkRead.isAvailable(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                                    if (dxl_getdata_result != true)
-                                    {
-										dxl_normal.store(0);
-                                        fprintf(stderr, "[ID:%03d] groupBulkRead getdata failed", DXL_ID3);
+										break;
+									}
+									// Get Dynamixel#2 present position value
+									dxl_present_position2 = groupBulkRead.getData(DXL_ID2, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									auto dxl2 = std::int16_t(dxl_present_position2);
+									current_pos2.store(1.0*dxl2 / SCALING);
+								}
+								if (dxl3_active)
+								{
+									dxl_getdata_result = groupBulkRead.isAvailable(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									if (dxl_getdata_result != true)
+									{
+										dxl3_state.store(-6);
+										fprintf(stderr, "[ID:%03d] groupBulkRead getdata failed", DXL_ID3);
 										enable_dynamixel_emily.store(0);
 										syn_clock.store(0);
-                                        break;
-                                    }
-                                    // Get Dynamixel#3 present position value
-                                    dxl_present_position3 = groupBulkRead.getData(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
-                                    auto dxl3 = std::int16_t(dxl_present_position3);
-                                    current_pos3.store(1.0*dxl3 / SCALING);
-                                }
-                                groupBulkRead.clearParam();
+										break;
+									}
+									// Get Dynamixel#3 present position value
+									dxl_present_position3 = groupBulkRead.getData(DXL_ID3, ADDR_MX_PRESENT_POSITION, LEN_MX_PRESENT_POSITION);
+									auto dxl3 = std::int16_t(dxl_present_position3);
+									current_pos3.store(1.0*dxl3 / SCALING);
+								}
+								groupBulkRead.clearParam();
 
-                                /*
-                                auto end = std::chrono::system_clock::now();
-                                auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(start2 - start1);
-                                auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end - start2);
-                                std::cout <<  "syncwrite:" << "\t" <<double(duration1.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
-                                    << "\t" << "bulkread:"<< "\t" << double(duration2.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
-                                                            << std::endl;
-                                */
+								/*
+								auto end = std::chrono::system_clock::now();
+								auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(start2 - start1);
+								auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end - start2);
+								std::cout <<  "syncwrite:" << "\t" <<double(duration1.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
+									<< "\t" << "bulkread:"<< "\t" << double(duration2.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den   << "s"
+															<< std::endl;
+								*/
 
-                                dxl_couter = dxl_couter + dxl_timeinterval;//emily舵机位置指向变量，dxl_timeinterval为舵机时间系数，默认值10
-                            }
-                            if(syn_clock.load() ==0 && dxl_couter >= data_length - 10)//舵机执行到最后一行
-                            {
+								dxl_couter = dxl_couter + dxl_timeinterval;//emily舵机位置指向变量，dxl_timeinterval为舵机时间系数，默认值10
+							}
+							if (syn_clock.load() == 0 && dxl_couter >= data_length - 10)//舵机执行到最后一行
+							{
 								enable_dynamixel_emily.store(0);
 								syn_clock.store(0);
 								break;
-                            }
+							}
 							std::this_thread::sleep_for(std::chrono::microseconds(500));
-                        }
+						}
 						std::cout << "emily mode end" << std::endl;
 					}
-                }
+				}
 
-                // Read the position of dynamixel1, dynamixel2, dynamixel3 //
-                read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1);
-                read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2);
-                read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3);
-                auto dxl1 = std::int16_t(dxl_present_position1);
-                auto dxl2 = std::int16_t(dxl_present_position2);
-                auto dxl3 = std::int16_t(dxl_present_position3);
-                current_pos1.store(1.0*dxl1 / SCALING);
-                current_pos2.store(1.0*dxl2 / SCALING);
-                current_pos3.store(1.0*dxl3 / SCALING);
-            }
+				// Read the position of dynamixel1, dynamixel2, dynamixel3 //
+				if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1))dxl1_state.store(-3);
+				if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2))dxl2_state.store(-3);
+				if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3))dxl3_state.store(-3);
+				auto dxl1 = std::int16_t(dxl_present_position1);
+				auto dxl2 = std::int16_t(dxl_present_position2);
+				auto dxl3 = std::int16_t(dxl_present_position3);
+				current_pos1.store(1.0*dxl1 / SCALING);
+				current_pos2.store(1.0*dxl2 / SCALING);
+				current_pos3.store(1.0*dxl3 / SCALING);
+				dxl1_state.store(5);
+				dxl2_state.store(5);
+				dxl3_state.store(5);
+
+				//连接失败
+				if (!dxl_connected.load())break;
+			}
             catch (std::exception &e)
             {
-                dxl_normal.store(0);
+				dxl1_state.store(-7);
+				dxl2_state.store(-7);
+				dxl3_state.store(-7);
                 std::cout << e.what() << std::endl;
                 LOG_ERROR << e.what() << std::endl;
             }
@@ -734,7 +775,12 @@ int main(int argc, char *argv[])
         }
 
         // Close port //
-        portHandler->closePort();
+		portHandler->closePort();
+		dxl_connected.store(0);
+		dxl1_state.store(-8);
+		dxl2_state.store(-8);
+		dxl3_state.store(-8);
+		goto start;		
     });
 
     std::cout <<"new"<<std::endl;
