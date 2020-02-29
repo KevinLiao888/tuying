@@ -29,6 +29,8 @@ extern std::atomic_int16_t current_pos1, current_pos2, current_pos3;
 extern std::vector<std::vector<double>> dxl_pos;
 extern std::atomic_bool dxl_connected;	//0:未连接，1:连接
 extern std::atomic_bool dxl_auto;		//0:手动运行中，1:自动运行中
+extern std::atomic_bool dxl_enabled;	//0:未使能，1:使能----第一版
+extern std::atomic_int dxl_normal;		//0:异常，1:正常----第一版
 extern std::atomic_int dxl1_state;
 extern std::atomic_int dxl2_state;
 extern std::atomic_int dxl3_state;
@@ -55,7 +57,8 @@ namespace kaanh
 #ifdef UNIX
 			double pos_offset[6]
 			{
-                -0.438460099997905,   1.01949192131931,   -1.00835441988747,   0.0315385382644258,   0.0943992339950059,   5.32826577904888
+                //-0.438460099997905,   1.01949192131931,   -1.00835441988747,   0.0315385382644258,   0.0943992339950059,   5.32826577904888
+                -0.438460099997905,   1.01949192131931,   -0.97083,   0.0315385382644258+2.747*3.14159/180.0,   0.0943992339950059+0.673*3.14159/180.0,   5.32826577904888+1.129*3.14159/180.0
 			};
 #endif
 			double pos_factor[6]
@@ -947,9 +950,11 @@ namespace kaanh
 		out_param.push_back(std::make_pair<std::string, std::any>("current_plan_id", cmdparam.current_plan_id));
 		out_param.push_back(std::make_pair<std::string, std::any>("dxl_connected", dxl_connected.load()));
 		out_param.push_back(std::make_pair<std::string, std::any>("dxl_auto", dxl_auto.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl_enabled", dxl_enabled.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl_normal", dxl_normal.load()));
 		out_param.push_back(std::make_pair<std::string, std::any>("dxl1_state", dxl1_state.load()));
-		out_param.push_back(std::make_pair<std::string, std::any>("dxl1_state", dxl2_state.load()));
-		out_param.push_back(std::make_pair<std::string, std::any>("dxl1_state", dxl3_state.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl2_state", dxl2_state.load()));
+		out_param.push_back(std::make_pair<std::string, std::any>("dxl3_state", dxl3_state.load()));
 		out_param.push_back(std::make_pair<std::string, std::any>("xbox_mode", xbox_mode.load()));
 
 		std::array<double, 10> temp = { 0,0,0,0,0,0,0,0,0,0 };
@@ -1579,10 +1584,14 @@ namespace kaanh
 			if (!param.target_pos[i].empty())
 			{
 				controller->motionPool()[i].setTargetPos(param.target_pos[i][target.count-1]);
+                if(i<6)
+                {
+                    target.model->motionPool().at(i).setMp(param.target_pos[i][target.count-1]);
+                }
 			}
 			total_count = std::max(param.target_pos[i].size(), total_count);
 		}
-		//if (target.model->solverPool().at(1).kinPos())return -1;
+        if (target.model->solverPool().at(1).kinPos())return -1;
 		// 打印 //
 		/*
 		auto &cout = controller->mout();
@@ -1892,6 +1901,10 @@ namespace kaanh
 				aris::plan::moveAbsolute(target.count, param.axis_begin_pos_vec[i], param.target_pos[i][0], param.axis_vel_vec[i] / 1000
 					, param.axis_acc_vec[i] / 1000 / 1000, param.axis_dec_vec[i] / 1000 / 1000, p, v, a, count);
 				controller->motionPool().at(i).setTargetPos(p);
+                if(i<6)
+                {
+                    target.model->motionPool().at(i).setMp(p);
+                }
 				total_count = std::max(count, total_count);
 			}
 		}
@@ -3400,16 +3413,18 @@ namespace kaanh
 		// get current pos //
 		if (target.count == 1)
 		{
-			/*
-			imp_->target_pos = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->p_now = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->v_now = controller->motionAtAbs(imp_->motion_id).actualVel();
-			imp_->a_now = 0.0;
-			*/
+
+            param.target_pos = controller->motionAtAbs(param.motion_id).actualPos();
+            param.p_now = controller->motionAtAbs(param.motion_id).actualPos();
+            param.v_now = controller->motionAtAbs(param.motion_id).actualVel();
+            param.a_now = 0.0;
+
+            /*
 			param.target_pos = target.model->motionPool().at(param.motion_id).mp();
 			param.p_now = target.model->motionPool()[param.motion_id].mp();
 			param.v_now = target.model->motionPool()[param.motion_id].mv();
 			param.a_now = 0.0;
+            */
 
 		}
 
@@ -3447,27 +3462,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << param.j1_count << "  ";
-			cout << param.target_pos << "  ";
-			cout << param.p_now << "  ";
-			cout << param.v_now << "  ";
-			cout << param.a_now << "  ";
-			cout << "------------------------------------------" << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		{
-			lout << param.target_pos << " ";
-			lout << param.p_now << " ";
-			lout << param.v_now << " ";
-			lout << param.a_now << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualPos() << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualVel() << " ";
-			lout << std::endl;
-		}
 
 		return finished;
 	}
@@ -3512,16 +3509,17 @@ namespace kaanh
 		// get current pos //
 		if (target.count == 1)
 		{
-			/*
-			imp_->target_pos = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->p_now = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->v_now = controller->motionAtAbs(imp_->motion_id).actualVel();
-			imp_->a_now = 0.0;
-			*/
+            param.target_pos = controller->motionAtAbs(param.motion_id).actualPos();
+            param.p_now = controller->motionAtAbs(param.motion_id).actualPos();
+            param.v_now = controller->motionAtAbs(param.motion_id).actualVel();
+            param.a_now = 0.0;
+
+            /*
 			param.target_pos = target.model->motionPool().at(param.motion_id).mp();
 			param.p_now = target.model->motionPool()[param.motion_id].mp();
 			param.v_now = target.model->motionPool()[param.motion_id].mv();
 			param.a_now = 0.0;
+            */
 
 		}
 
@@ -3559,27 +3557,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << param.j2_count << "  ";
-			cout << param.target_pos << "  ";
-			cout << param.p_now << "  ";
-			cout << param.v_now << "  ";
-			cout << param.a_now << "  ";
-			cout << "------------------------------------------" << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		{
-			lout << param.target_pos << " ";
-			lout << param.p_now << " ";
-			lout << param.v_now << " ";
-			lout << param.a_now << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualPos() << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualVel() << " ";
-			lout << std::endl;
-		}
 
 		return finished;
 	}
@@ -3623,16 +3603,17 @@ namespace kaanh
 		// get current pos //
 		if (target.count == 1)
 		{
-			/*
-			imp_->target_pos = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->p_now = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->v_now = controller->motionAtAbs(imp_->motion_id).actualVel();
-			imp_->a_now = 0.0;
-			*/
+
+            param.target_pos = controller->motionAtAbs(param.motion_id).actualPos();
+            param.p_now = controller->motionAtAbs(param.motion_id).actualPos();
+            param.v_now = controller->motionAtAbs(param.motion_id).actualVel();
+            param.a_now = 0.0;
+            /*
 			param.target_pos = target.model->motionPool().at(param.motion_id).mp();
 			param.p_now = target.model->motionPool()[param.motion_id].mp();
 			param.v_now = target.model->motionPool()[param.motion_id].mv();
 			param.a_now = 0.0;
+            */
 
 		}
 
@@ -3670,27 +3651,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << param.j3_count << "  ";
-			cout << param.target_pos << "  ";
-			cout << param.p_now << "  ";
-			cout << param.v_now << "  ";
-			cout << param.a_now << "  ";
-			cout << "------------------------------------------" << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		{
-			lout << param.target_pos << " ";
-			lout << param.p_now << " ";
-			lout << param.v_now << " ";
-			lout << param.a_now << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualPos() << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualVel() << " ";
-			lout << std::endl;
-		}
 
 		return finished;
 	}
@@ -3734,16 +3697,16 @@ namespace kaanh
 		// get current pos //
 		if (target.count == 1)
 		{
-			/*
-			imp_->target_pos = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->p_now = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->v_now = controller->motionAtAbs(imp_->motion_id).actualVel();
-			imp_->a_now = 0.0;
-			*/
+            param.target_pos = controller->motionAtAbs(param.motion_id).actualPos();
+            param.p_now = controller->motionAtAbs(param.motion_id).actualPos();
+            param.v_now = controller->motionAtAbs(param.motion_id).actualVel();
+            param.a_now = 0.0;
+            /*
 			param.target_pos = target.model->motionPool().at(param.motion_id).mp();
 			param.p_now = target.model->motionPool()[param.motion_id].mp();
 			param.v_now = target.model->motionPool()[param.motion_id].mv();
 			param.a_now = 0.0;
+            */
 
 		}
 
@@ -3781,27 +3744,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << param.j4_count << "  ";
-			cout << param.target_pos << "  ";
-			cout << param.p_now << "  ";
-			cout << param.v_now << "  ";
-			cout << param.a_now << "  ";
-			cout << "------------------------------------------" << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		{
-			lout << param.target_pos << " ";
-			lout << param.p_now << " ";
-			lout << param.v_now << " ";
-			lout << param.a_now << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualPos() << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualVel() << " ";
-			lout << std::endl;
-		}
 
 		return finished;
 	}
@@ -3845,16 +3790,16 @@ namespace kaanh
 		// get current pos //
 		if (target.count == 1)
 		{
-			/*
-			imp_->target_pos = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->p_now = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->v_now = controller->motionAtAbs(imp_->motion_id).actualVel();
-			imp_->a_now = 0.0;
-			*/
+            param.target_pos = controller->motionAtAbs(param.motion_id).actualPos();
+            param.p_now = controller->motionAtAbs(param.motion_id).actualPos();
+            param.v_now = controller->motionAtAbs(param.motion_id).actualVel();
+            param.a_now = 0.0;
+            /*
 			param.target_pos = target.model->motionPool().at(param.motion_id).mp();
 			param.p_now = target.model->motionPool()[param.motion_id].mp();
 			param.v_now = target.model->motionPool()[param.motion_id].mv();
 			param.a_now = 0.0;
+            */
 
 		}
 
@@ -3892,27 +3837,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << param.j5_count << "  ";
-			cout << param.target_pos << "  ";
-			cout << param.p_now << "  ";
-			cout << param.v_now << "  ";
-			cout << param.a_now << "  ";
-			cout << "------------------------------------------" << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		{
-			lout << param.target_pos << " ";
-			lout << param.p_now << " ";
-			lout << param.v_now << " ";
-			lout << param.a_now << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualPos() << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualVel() << " ";
-			lout << std::endl;
-		}
 
 		return finished;
 	}
@@ -3956,16 +3883,17 @@ namespace kaanh
 		// get current pos //
 		if (target.count == 1)
 		{
-			/*
-			imp_->target_pos = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->p_now = controller->motionAtAbs(imp_->motion_id).actualPos();
-			imp_->v_now = controller->motionAtAbs(imp_->motion_id).actualVel();
-			imp_->a_now = 0.0;
-			*/
+            param.target_pos = controller->motionAtAbs(param.motion_id).actualPos();
+            param.p_now = controller->motionAtAbs(param.motion_id).actualPos();
+            param.v_now = controller->motionAtAbs(param.motion_id).actualVel();
+            param.a_now = 0.0;
+
+            /*
 			param.target_pos = target.model->motionPool().at(param.motion_id).mp();
 			param.p_now = target.model->motionPool()[param.motion_id].mp();
 			param.v_now = target.model->motionPool()[param.motion_id].mv();
 			param.a_now = 0.0;
+            */
 
 		}
 
@@ -4003,27 +3931,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << param.j6_count << "  ";
-			cout << param.target_pos << "  ";
-			cout << param.p_now << "  ";
-			cout << param.v_now << "  ";
-			cout << param.a_now << "  ";
-			cout << "------------------------------------------" << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		{
-			lout << param.target_pos << " ";
-			lout << param.p_now << " ";
-			lout << param.v_now << " ";
-			lout << param.a_now << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualPos() << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualVel() << " ";
-			lout << std::endl;
-		}
 
 		return finished;
 	}
@@ -4149,27 +4059,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << param.j7_count << "  ";
-			cout << param.target_pos << "  ";
-			cout << param.p_now << "  ";
-			cout << param.v_now << "  ";
-			cout << param.a_now << "  ";
-			cout << "------------------------------------------" << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		{
-			lout << param.target_pos << " ";
-			lout << param.p_now << " ";
-			lout << param.v_now << " ";
-			lout << param.a_now << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualPos() << " ";
-			lout << controller->motionAtAbs(param.motion_id).actualVel() << " ";
-			lout << std::endl;
-		}
 
 		return finished;
 	}
@@ -4751,34 +4643,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 100 == 0)
-		{
-			cout << "jx_count:" << std::endl;
-			cout << param.jx_count << "  ";
-			cout << std::endl;
-			cout << "increase_status:" << std::endl;
-			cout << param.increase_status[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "p_next:" << std::endl;
-			cout << p_next[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "v_next:" << std::endl;
-			cout << v_next[param.moving_type] << "  ";
-			cout << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		for (int i = 0; i < 6; i++)
-		{
-			lout << target_p[i] << " ";
-			lout << p_now[i] << " ";
-			lout << v_now[i] << " ";
-			lout << a_now[i] << " ";
-			lout << controller->motionAtAbs(i).actualPos() << " ";
-			lout << controller->motionAtAbs(i).actualVel() << " ";
-		}
-		lout << std::endl;
 
 		return finished[param.moving_type];
 	}
@@ -4909,34 +4776,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << "jy_count:" << std::endl;
-			cout << param.jy_count << "  ";
-			cout << std::endl;
-			cout << "increase_status:" << std::endl;
-			cout << param.increase_status[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "p_next:" << std::endl;
-			cout << p_next[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "v_next:" << std::endl;
-			cout << v_next[param.moving_type] << "  ";
-			cout << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		for (int i = 0; i < 6; i++)
-		{
-			lout << target_p[i] << " ";
-			lout << p_now[i] << " ";
-			lout << v_now[i] << " ";
-			lout << a_now[i] << " ";
-			lout << controller->motionAtAbs(i).actualPos() << " ";
-			lout << controller->motionAtAbs(i).actualVel() << " ";
-		}
-		lout << std::endl;
 
 		return finished[param.moving_type];
 	}
@@ -5067,34 +4909,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << "jz_count:" << std::endl;
-			cout << param.jz_count << "  ";
-			cout << std::endl;
-			cout << "increase_status:" << std::endl;
-			cout << param.increase_status[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "p_next:" << std::endl;
-			cout << p_next[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "v_next:" << std::endl;
-			cout << v_next[param.moving_type] << "  ";
-			cout << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		for (int i = 0; i < 6; i++)
-		{
-			lout << target_p[i] << " ";
-			lout << p_now[i] << " ";
-			lout << v_now[i] << " ";
-			lout << a_now[i] << " ";
-			lout << controller->motionAtAbs(i).actualPos() << " ";
-			lout << controller->motionAtAbs(i).actualVel() << " ";
-		}
-		lout << std::endl;
 
 		return finished[param.moving_type];
 	}
@@ -5225,34 +5042,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << "jrx_count:" << std::endl;
-			cout << param.jrx_count << "  ";
-			cout << std::endl;
-			cout << "increase_status:" << std::endl;
-			cout << param.increase_status[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "p_next:" << std::endl;
-			cout << p_next[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "v_next:" << std::endl;
-			cout << v_next[param.moving_type] << "  ";
-			cout << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		for (int i = 0; i < 6; i++)
-		{
-			lout << target_p[i] << " ";
-			lout << p_now[i] << " ";
-			lout << v_now[i] << " ";
-			lout << a_now[i] << " ";
-			lout << controller->motionAtAbs(i).actualPos() << " ";
-			lout << controller->motionAtAbs(i).actualVel() << " ";
-		}
-		lout << std::endl;
 
 		return finished[param.moving_type];
 	}
@@ -5383,34 +5175,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << "jry_count:" << std::endl;
-			cout << param.jry_count << "  ";
-			cout << std::endl;
-			cout << "increase_status:" << std::endl;
-			cout << param.increase_status[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "p_next:" << std::endl;
-			cout << p_next[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "v_next:" << std::endl;
-			cout << v_next[param.moving_type] << "  ";
-			cout << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		for (int i = 0; i < 6; i++)
-		{
-			lout << target_p[i] << " ";
-			lout << p_now[i] << " ";
-			lout << v_now[i] << " ";
-			lout << a_now[i] << " ";
-			lout << controller->motionAtAbs(i).actualPos() << " ";
-			lout << controller->motionAtAbs(i).actualVel() << " ";
-		}
-		lout << std::endl;
 
 		return finished[param.moving_type];
 	}
@@ -5541,34 +5308,9 @@ namespace kaanh
 
 		// 打印 //
 		auto &cout = controller->mout();
-		if (target.count % 10 == 0)
-		{
-			cout << "jrz_count:" << std::endl;
-			cout << param.jrz_count << "  ";
-			cout << std::endl;
-			cout << "increase_status:" << std::endl;
-			cout << param.increase_status[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "p_next:" << std::endl;
-			cout << p_next[param.moving_type] << "  ";
-			cout << std::endl;
-			cout << "v_next:" << std::endl;
-			cout << v_next[param.moving_type] << "  ";
-			cout << std::endl;
-		}
 
 		// log //
 		auto &lout = controller->lout();
-		for (int i = 0; i < 6; i++)
-		{
-			lout << target_p[i] << " ";
-			lout << p_now[i] << " ";
-			lout << v_now[i] << " ";
-			lout << a_now[i] << " ";
-			lout << controller->motionAtAbs(i).actualPos() << " ";
-			lout << controller->motionAtAbs(i).actualVel() << " ";
-		}
-		lout << std::endl;
 
 		return finished[param.moving_type];
 	}

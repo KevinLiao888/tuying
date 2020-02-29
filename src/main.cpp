@@ -87,10 +87,12 @@ bool dxl_getdata_result = false;                  // GetParam result
 
 //dynamixel state flag//
 std::atomic_bool dxl_connected = 0;	//0:未连接，1:连接
-std::atomic_bool dxl_auto = 0;		//0:手动运行中，1:自动运行中
+std::atomic_bool dxl_auto = 0;		//0:手动运行中，1:自动运行中----第一版
 std::atomic_int dxl1_state = 0;		//0:未使能，1:使能，2:手动运行中，3，正在执行emily，4:正在找home，5:等待命令，-1:使能失败，-2:去使能失败，-3:读位置失败，-4:写位置失败，-5:同步写失败，-6:同步读失败，-7:其他异常，-8:舵机断连接
 std::atomic_int dxl2_state = 0;
 std::atomic_int dxl3_state = 0;
+std::atomic_bool dxl_enabled = 0;	//0:未使能，1:使能----第一版
+std::atomic_int dxl_normal = 1;		//0:异常，1:正常----第一版
 
 const int dxl_timeinterval = 10;	//舵机时间系数
 
@@ -169,6 +171,7 @@ auto enable_dynamixel(dynamixel::PortHandler *portHandler, dynamixel::PacketHand
     }
     else
     {
+		dxl_normal.store(1);//第一版
         //std::cout << "Dynamixel " << dxl_id << " has been successfully enabled" << std::endl;
 		return 1;
     }
@@ -329,6 +332,8 @@ int main(int argc, char *argv[])
 
         // Open port 每次运行程序尝试连接端口，每秒钟一次，1min连接失败，退出 //
 		start:int connecting_couter = 120;
+		dxl_enabled.store(0);//第一版
+		dxl_normal.store(0);//第一版
 		while (connecting_couter > 0)
 		{
 			if (portHandler->openPort())
@@ -401,6 +406,7 @@ int main(int argc, char *argv[])
 					target_pos3.store(dxl_present_position3);
 					is_enabled.store(2);
 					enabled = true;
+					dxl_enabled.store(true);//第一版
 				}
 				else if (en == 0)// Disable //
 				{
@@ -409,6 +415,7 @@ int main(int argc, char *argv[])
 					if (!disable_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3))dxl3_state.store(-2);
 					is_enabled.store(2);
 					enabled = false;
+					dxl_enabled.store(false);//第一版
 				}
 				if (enabled)
 				{
@@ -747,19 +754,46 @@ int main(int argc, char *argv[])
 				}
 
 				// Read the position of dynamixel1, dynamixel2, dynamixel3 //
-				if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1))dxl1_state.store(-3);
-				if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2))dxl2_state.store(-3);
-				if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3))dxl3_state.store(-3);
-				auto dxl1 = std::int16_t(dxl_present_position1);
-				auto dxl2 = std::int16_t(dxl_present_position2);
-				auto dxl3 = std::int16_t(dxl_present_position3);
-				current_pos1.store(1.0*dxl1 / SCALING);
-				current_pos2.store(1.0*dxl2 / SCALING);
-				current_pos3.store(1.0*dxl3 / SCALING);
-				dxl1_state.store(5);
-				dxl2_state.store(5);
-				dxl3_state.store(5);
-
+				if (dxl1_state.load() == 1)
+				{
+					if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result1, DXL_ID1, BAUDRATE1, dxl_present_position1))
+					{
+						dxl1_state.store(-3);
+					}
+					else
+					{
+						auto dxl1 = std::int16_t(dxl_present_position1);
+						current_pos1.store(1.0*dxl1 / SCALING);
+						dxl1_state.store(5);
+					}
+				}
+				if (dxl2_state.load() == 1)
+				{
+					if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result2, DXL_ID2, BAUDRATE2, dxl_present_position2))
+					{
+						dxl2_state.store(-3);
+					}
+					else
+					{
+						auto dxl2 = std::int16_t(dxl_present_position2);
+						current_pos2.store(1.0*dxl2 / SCALING);
+						dxl2_state.store(5);
+					}
+				}
+				if (dxl3_state.load() == 1)
+				{
+					if (!read_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, dxl_present_position3))
+					{
+						dxl3_state.store(-3);
+					}
+					else
+					{
+						auto dxl3 = std::int16_t(dxl_present_position3);
+						current_pos3.store(1.0*dxl3 / SCALING);
+						dxl3_state.store(5);
+					}
+				}
+				
 				//连接失败
 				if (!dxl_connected.load())break;
 			}
@@ -777,10 +811,13 @@ int main(int argc, char *argv[])
         // Close port //
 		portHandler->closePort();
 		dxl_connected.store(0);
+		dxl_enabled.store(0);//第一版
+		dxl_normal.store(0);//第一版
 		dxl1_state.store(-8);
 		dxl2_state.store(-8);
 		dxl3_state.store(-8);
-		goto start;		
+        goto start;
+
     });
 
     std::cout <<"new"<<std::endl;
@@ -792,8 +829,9 @@ int main(int argc, char *argv[])
     auto port = argc < 2 ? 5866 : std::stoi(argv[1]);
 
 
-    //生成kaanh.xml文档
+    //生成kaanh.xml文档//
     //-------for qifan robot begin//
+    /*
     cs.resetController(kaanh::createControllerQifan().release());
     cs.resetModel(kaanh::createModelQifan().release());
     cs.resetPlanRoot(kaanh::createPlanRootRokaeXB4().release());
@@ -805,6 +843,7 @@ int main(int argc, char *argv[])
     cs.model().loadXmlFile(modelxmlpath.string().c_str());
     cs.interfaceRoot().loadXmlFile(uixmlpath.string().c_str());
     cs.saveXmlFile(xmlpath.string().c_str());
+    */
     //-------for qifan robot end//
 
 
