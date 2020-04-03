@@ -4203,22 +4203,22 @@ namespace kaanh
 			{
 				step = 11.378*std::stod(p.second);
 				direction = std::stoi(params.at("direction"));
+				if (dxl1_state.load() > 0)dynamixel_control_mode.store(1);
 			}	
 			else if (p.first == "stop")
 			{
 				step = 0;
+				dynamixel_control_mode.store(0);
 			}
 		}
         
-		if (dxl1_state.load() > 0)
+		if (dxl1_state.load() > 0 && dxl1_state.load() < 3)
 		{
 			dx_pos1 = target_pos1.load();
 			dx_pos1 += direction * step;
 			dx_pos1 = std::min(28672, std::max(dx_pos1, -28672));
 			target_pos1.store(dx_pos1);
 		}
-
-		dynamixel_control_mode.store(1);
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
@@ -4250,21 +4250,23 @@ namespace kaanh
 			{
 				step = 11.378*std::stod(p.second);
 				direction = std::stoi(params.at("direction"));
+				if (dxl2_state.load() > 0)dynamixel_control_mode.store(1);
 			}
 			else if (p.first == "stop")
 			{
 				step = 0;
+				dynamixel_control_mode.store(0);
 			}
 		}
 		
-		if (dxl2_state.load() > 0)
+		if (dxl2_state.load() > 0 && dxl2_state.load() < 3)
 		{
 			dx_pos2 = target_pos2.load();
 			dx_pos2 += direction * step;
 			dx_pos2 = std::min(28672, std::max(dx_pos2, -28672));
 			target_pos2.store(dx_pos2);
 		}
-		dynamixel_control_mode.store(1);
+		
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
@@ -4296,21 +4298,23 @@ namespace kaanh
 			{
 				step = 11.378*std::stod(p.second);
 				direction = std::stoi(params.at("direction"));
+				if (dxl3_state.load() > 0)dynamixel_control_mode.store(1);
 			}
 			else if (p.first == "stop")
 			{
 				step = 0;
+				dynamixel_control_mode.store(0);
 			}
 		}
         
-		if (dxl3_state.load() > 0)
+		if (dxl3_state.load() > 0 && dxl3_state.load() < 3)
 		{
 			dx_pos3 = target_pos3.load();
 			dx_pos3 += direction * step;
 			dx_pos3 = std::min(28672, std::max(dx_pos3, -28672));
 			target_pos3.store(dx_pos3);
 		}
-		dynamixel_control_mode.store(1);
+		
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;

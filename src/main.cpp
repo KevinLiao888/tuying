@@ -449,7 +449,6 @@ int main(int argc, char *argv[])
 								auto pos3 = target_pos3.load();
 								dxl3_state.store(write_dynamixel(portHandler, packetHandler, dxl_comm_result3, DXL_ID3, BAUDRATE3, pos3) ? 2 : -4);
 							}
-							dynamixel_control_mode.store(0);
 							std::cout << "manual mode end" << std::endl;
 						}
 						else if (dynamixel_control_mode.load() == 2)
