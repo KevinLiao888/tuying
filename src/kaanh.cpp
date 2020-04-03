@@ -19,9 +19,7 @@ extern std::atomic_int g_vel_percent;
 extern std::atomic_int syn_clock;
 extern std::mutex dynamixel_mutex;
 extern std::atomic_int mode_dynamixel;
-extern std::atomic_bool enable_dynamixel_emily;
-extern std::atomic_bool enable_dynamixel_manual;
-extern std::atomic_bool enable_dynamixel_home;
+extern std::atomic_int dynamixel_control_mode;
 extern std::atomic_int is_enabled;
 extern std::atomic_int16_t target_pos1, target_pos2, target_pos3;
 extern bool dxl1_active, dxl2_active, dxl3_active;
@@ -1184,7 +1182,7 @@ namespace kaanh
 		target.ret = ret;
 
 		// 使能舵机emily功能 //
-		enable_dynamixel_emily.store(true);
+		dynamixel_control_mode.store(3);
 	}
 	auto MoveT::executeRT(PlanTarget &target)->int
 	{
@@ -1309,7 +1307,7 @@ namespace kaanh
 				dxl_pos.clear();
 				dxl_pos.resize(3);
 #ifdef WIN32
-				auto path = "C:/Users/kevin/Desktop/tuying/emily/" + cmd_param.second;
+				auto path = "D:/tuying/emily/" + cmd_param.second;
 #endif
 #ifdef UNIX
 				auto path = "/home/kaanh/Desktop/emily/" + cmd_param.second;
@@ -1524,7 +1522,7 @@ namespace kaanh
         
 		std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER | Plan::NOT_CHECK_POS_CONTINUOUS);
 		// 使能舵机emily功能 //
-		enable_dynamixel_emily.store(true);
+		dynamixel_control_mode.store(3);
 		target.param = param;
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
@@ -1692,7 +1690,7 @@ namespace kaanh
 				dxl_pos.clear();
 				dxl_pos.resize(3);
 #ifdef WIN32
-				auto path = "C:/Users/kevin/Desktop/tuying/emily/" + cmd_param.second;
+				auto path = "D:/tuying/emily/" + cmd_param.second;
 #endif
 #ifdef UNIX
 				auto path = "/home/kaanh/Desktop/emily/" + cmd_param.second;
@@ -1852,7 +1850,7 @@ namespace kaanh
 				}
 			}
 		}
-        enable_dynamixel_manual.store(1);
+		dynamixel_control_mode.store(1);
         std::fill(target.mot_options.begin(), target.mot_options.end(), Plan::NOT_CHECK_POS_CONTINUOUS_SECOND_ORDER|Plan::NOT_CHECK_POS_CONTINUOUS);
         target.param = param;
         std::vector<std::pair<std::string, std::any>> ret;
@@ -4212,11 +4210,15 @@ namespace kaanh
 			}
 		}
         
-		dx_pos1 = target_pos1.load();
-		dx_pos1 += direction * step;
-		dx_pos1 = std::min(28672,std::max(dx_pos1,-28672));
-		target_pos1.store(dx_pos1);
-		enable_dynamixel_manual.store(1);
+		if (dxl1_state.load() > 0)
+		{
+			dx_pos1 = target_pos1.load();
+			dx_pos1 += direction * step;
+			dx_pos1 = std::min(28672, std::max(dx_pos1, -28672));
+			target_pos1.store(dx_pos1);
+		}
+
+		dynamixel_control_mode.store(1);
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
@@ -4254,12 +4256,15 @@ namespace kaanh
 				step = 0;
 			}
 		}
-        
-		dx_pos2 = target_pos2.load();
-		dx_pos2 += direction * step;
-		dx_pos2 = std::min(28672, std::max(dx_pos2, -28672));
-		target_pos2.store(dx_pos2);
-		enable_dynamixel_manual.store(1);
+		
+		if (dxl2_state.load() > 0)
+		{
+			dx_pos2 = target_pos2.load();
+			dx_pos2 += direction * step;
+			dx_pos2 = std::min(28672, std::max(dx_pos2, -28672));
+			target_pos2.store(dx_pos2);
+		}
+		dynamixel_control_mode.store(1);
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
@@ -4298,11 +4303,14 @@ namespace kaanh
 			}
 		}
         
-		dx_pos3 = target_pos3.load();
-		dx_pos3 += direction * step;
-		dx_pos3 = std::min(28672, std::max(dx_pos3, -28672));
-		target_pos3.store(dx_pos3);
-		enable_dynamixel_manual.store(1);
+		if (dxl3_state.load() > 0)
+		{
+			dx_pos3 = target_pos3.load();
+			dx_pos3 += direction * step;
+			dx_pos3 = std::min(28672, std::max(dx_pos3, -28672));
+			target_pos3.store(dx_pos3);
+		}
+		dynamixel_control_mode.store(1);
 
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
@@ -4351,7 +4359,7 @@ namespace kaanh
         std::vector<std::pair<std::string, std::any>> ret;
         target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
-		enable_dynamixel_home.store(true);
+		dynamixel_control_mode.store(2);
     }
     auto DHome::collectNrt(PlanTarget &target)->void {}
     DHome::DHome(const std::string &name) :Plan(name)
@@ -4428,7 +4436,7 @@ namespace kaanh
 		std::vector<std::pair<std::string, std::any>> ret;
 		target.ret = ret;
         std::fill(target.mot_options.begin(), target.mot_options.end(), NOT_CHECK_ENABLE);
-		enable_dynamixel_manual.store(1);
+		dynamixel_control_mode.store(1);
 	}
 	auto DMoveAbsJ::collectNrt(PlanTarget &target)->void {}
 	DMoveAbsJ::DMoveAbsJ(const std::string &name) :Plan(name)
@@ -5921,8 +5929,8 @@ namespace kaanh
 	}
 
 
-	// 保存示教点 //
-	auto SaveHome::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	// 保存home点 //
+	auto SetHome::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
 	{
 		auto&cs = aris::server::ControlServer::instance();
 	
@@ -5955,13 +5963,50 @@ namespace kaanh
 		target.ret = ret;
 		target.option = aris::plan::Plan::NOT_RUN_EXECUTE_FUNCTION;
 	}
+	SetHome::SetHome(const std::string &name) :Plan(name)
+	{
+		command().loadXmlStr(
+			"<Command name=\"sethome\">"
+			"	<GroupParam>"
+            "		<Param name=\"name\" default=\"homepoint\"/>"
+			"	</GroupParam>"
+			"</Command>");
+	}
+
+
+	// 保存home点 //
+	auto SaveHome::prepairNrt(const std::map<std::string, std::string> &params, PlanTarget &target)->void
+	{
+		auto offset0 = dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[0]).posOffset();
+		auto offset1 = dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[1]).posOffset();
+		auto offset2 = dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[2]).posOffset();
+		auto offset3 = dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[3]).posOffset();
+		auto offset4 = dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[4]).posOffset();
+		auto offset5 = dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[5]).posOffset();
+		auto offset6 = dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[6]).posOffset();
+
+		dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[0]).setPosOffset(target.controller->motionPool()[0].actualPos() + offset0);
+		dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[1]).setPosOffset(target.controller->motionPool()[1].actualPos() + offset1);
+		dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[2]).setPosOffset(target.controller->motionPool()[2].actualPos() + offset2);
+		dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[3]).setPosOffset(target.controller->motionPool()[3].actualPos() + offset3);
+		dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[4]).setPosOffset(target.controller->motionPool()[4].actualPos() + offset4);
+		dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[5]).setPosOffset(target.controller->motionPool()[5].actualPos() + offset5);
+		dynamic_cast<aris::control::Motion&>(target.controller->slavePool()[6]).setPosOffset(target.controller->motionPool()[6].actualPos() + offset6);
+
+		auto&cs = aris::server::ControlServer::instance();
+		auto xmlpath = std::filesystem::absolute(".");
+		const std::string xmlfile = "kaanh.xml";
+		xmlpath = xmlpath / xmlfile;
+		cs.saveXmlFile(xmlpath.string().c_str());
+
+		std::vector<std::pair<std::string, std::any>> ret;
+		target.ret = ret;
+		target.option = aris::plan::Plan::NOT_RUN_EXECUTE_FUNCTION|NOT_RUN_COLLECT_FUNCTION;
+	}
 	SaveHome::SaveHome(const std::string &name) :Plan(name)
 	{
 		command().loadXmlStr(
 			"<Command name=\"savehome\">"
-			"	<GroupParam>"
-            "		<Param name=\"name\" default=\"homepoint\"/>"
-			"	</GroupParam>"
 			"</Command>");
 	}
 
@@ -6006,7 +6051,7 @@ namespace kaanh
 					target_pos1.store(temp[7] * 11.378);
 					target_pos2.store(temp[8] * 11.378);
 					target_pos3.store(temp[9] * 11.378);
-					enable_dynamixel_manual.store(1);
+					dynamixel_control_mode.store(1);
 				}
 				else
 				{
